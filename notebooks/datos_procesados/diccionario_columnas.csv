@@ -1,0 +1,59 @@
+columna,origen_nist,tipo,unidad,descripcion
+id_linea,(generada),entero,-,Identificador unico de la linea espectral
+elemento,element,texto,-,Simbolo quimico del elemento
+espectro,element + sp_num,texto,-,Elemento y estado de ionizacion (ej. 'Ne II')
+estado_ionizacion,sp_num,entero,-,"1 = neutro, 2 = una vez ionizado"
+longitud_onda_nm,obs_wl / ritz_wl,decimal,nm,"Longitud de onda definitiva (observada, o Ritz si falta)"
+longitud_onda_vacio_nm,(derivada),decimal,nm,Longitud de onda homogeneizada al vacio
+longitud_onda_origen,(derivada),texto,-,'observada' o 'ritz': de donde salio el valor
+medio,(posicion en el archivo),texto,-,'aire' o 'vacio': medio en que se midio
+longitud_onda_obs_nm,obs_wl_vac(nm),decimal,nm,Longitud de onda medida experimentalmente
+longitud_onda_ritz_nm,ritz_wl_vac(nm),decimal,nm,Longitud de onda calculada de la diferencia de niveles
+ritz_es_limite,ritz_wl (sufijo +),booleano,-,"El valor Ritz es un limite, no un valor exacto"
+incertidumbre_obs_nm,unc_obs_wl,decimal,nm,Incertidumbre de la longitud de onda observada
+incertidumbre_ritz_nm,unc_ritz_wl,decimal,nm,Incertidumbre de la longitud de onda Ritz
+region_espectral,(derivada),texto,-,Rayos X / Ultravioleta / Visible / Infrarrojo / Microondas
+aki_s1,Aki(s^-1),decimal,s^-1,Coeficiente de Einstein: probabilidad de emision espontanea
+log10_aki,(derivada),decimal,-,Logaritmo decimal de Aki
+tiene_aki,(derivada),booleano,-,Si la linea tiene Aki documentado
+fuerza_oscilador_fik,fik,decimal,-,Fuerza de oscilador de la transicion
+log_gf,log_gf,decimal,-,Logaritmo del producto g*f
+exactitud,Acc,categoria ordinal,-,"Escala de exactitud del NIST, de AAA (mejor) a E (peor)"
+tipo_transicion,Type,texto,-,E1 permitida; E2/M1/M2 prohibidas; UT sin clasificar
+intensidad_valor,intens,decimal,u. arbitrarias,Intensidad relativa (escala propia de cada espectro)
+intensidad_bandera,intens,texto,-,"Bandera de calidad de la linea (*, a, b...)"
+energia_inferior_cm1,Ei(cm-1),decimal,cm^-1,Energia del nivel inferior de la transicion
+energia_superior_cm1,Ek(cm-1),decimal,cm^-1,Energia del nivel superior de la transicion
+energia_inferior_interpolada,Ei (corchetes),booleano,-,"La energia inferior es interpolada, no medida"
+energia_superior_interpolada,Ek (corchetes),booleano,-,"La energia superior es interpolada, no medida"
+energia_inferior_origen_desconocido,Ei (sufijo +x),booleano,-,Energia referida a un origen desconocido
+energia_superior_origen_desconocido,Ek (sufijo +x),booleano,-,Energia referida a un origen desconocido
+energia_foton_ev,(derivada),decimal,eV,Energia del foton emitido en la transicion
+configuracion_inferior,conf_i,texto,-,Configuracion electronica del nivel inferior
+termino_inferior,term_i,texto,-,Termino espectroscopico del nivel inferior
+j_inferior,J_i,decimal,-,Momento angular total del nivel inferior
+j_inferior_texto,J_i,texto,-,Valor original de J (puede ser '1/2' o no resuelto)
+j_inferior_resuelto,(derivada),booleano,-,Si el NIST determino un unico valor de J
+g_inferior,g_i,entero,-,Degeneracion del nivel inferior (g = 2J+1)
+configuracion_superior,conf_k,texto,-,Configuracion electronica del nivel superior
+termino_superior,term_k,texto,-,Termino espectroscopico del nivel superior
+j_superior,J_k,decimal,-,Momento angular total del nivel superior
+j_superior_texto,J_k,texto,-,Valor original de J del nivel superior
+j_superior_resuelto,(derivada),booleano,-,Si el NIST determino un unico valor de J
+g_superior,g_k,entero,-,Degeneracion del nivel superior
+id_nivel_inferior,ID_i,texto,-,Identificador NIST del nivel inferior (clave foranea)
+id_nivel_superior,ID_k,texto,-,Identificador NIST del nivel superior (clave foranea)
+ref_probabilidad,tp_ref,texto,-,Referencias de la probabilidad de transicion (lista)
+ref_longitud_onda,line_ref,texto,-,Referencias de la longitud de onda (lista)
+medicion_repetida,(derivada),booleano,-,La transicion aparece medida mas de una vez
+id_nivel,Level ID,texto,-,Identificador NIST del nivel (clave primaria)
+configuracion,Configuration,texto,-,Configuracion electronica del nivel
+termino,Term,texto,-,Termino espectroscopico del nivel
+j_valor,J,decimal,-,Momento angular total del nivel
+j_texto,J,texto,-,Valor original de J
+j_resuelto,(derivada),booleano,-,Si el NIST determino un unico valor de J
+g,g,entero,-,Degeneracion estadistica del nivel
+energia_ev,Level (eV),decimal,eV,Energia del nivel
+energia_interpolada,Prefix,booleano,-,"La energia es interpolada, no medida"
+incertidumbre_ev,Uncertainty (eV),decimal,eV,Incertidumbre de la energia del nivel
+referencia,Reference,texto,-,Referencias bibliograficas del nivel (lista)
