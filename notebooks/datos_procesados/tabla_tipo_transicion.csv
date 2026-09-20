@@ -1,0 +1,6 @@
+codigo,nombre,es_permitida,descripcion
+E1,Dipolo electrico,True,"Transicion permitida, la mas comun y brillante"
+E2,Cuadrupolo electrico,False,Transicion prohibida
+M1,Dipolo magnetico,False,Transicion prohibida
+M2,Cuadrupolo magnetico,False,Transicion prohibida
+UT,Sin clasificar,False,Tipo no determinado por el NIST

@@ -1,0 +1,14 @@
+codigo,orden,tolerancia_max_pct,descripcion
+AAA,1,0.3,Incertidumbre estimada hasta 0.3%
+AA,2,1.0,Incertidumbre estimada hasta 1%
+A+,3,2.0,Incertidumbre estimada hasta 2%
+A,4,3.0,Incertidumbre estimada hasta 3%
+B+,5,7.0,Incertidumbre estimada hasta 7%
+B,6,10.0,Incertidumbre estimada hasta 10%
+B',7,10.0,Incertidumbre estimada hasta 10%
+C+,8,18.0,Incertidumbre estimada hasta 18%
+C,9,25.0,Incertidumbre estimada hasta 25%
+C',10,25.0,Incertidumbre estimada hasta 25%
+D+,11,40.0,Incertidumbre estimada hasta 40%
+D,12,50.0,Incertidumbre estimada hasta 50%
+E,13,50.0,Incertidumbre estimada hasta 50%
