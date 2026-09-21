@@ -25,6 +25,8 @@ services:
     restart: unless-stopped
     environment:
       JUPYTER_TOKEN: ${JUPYTER_TOKEN}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     ports:
       - "8888:8888"
     volumes:

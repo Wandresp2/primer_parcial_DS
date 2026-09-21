@@ -9,8 +9,10 @@
 -- notebook notebooks/05_pipeline_etl_mysql.ipynb.
 --
 -- Orden de ejecucion del proyecto:
---   1. docker compose up -d          (levanta MySQL y crea la base db_prueba)
---   2. Ejecutar este archivo en DBeaver, conectado a db_prueba   <-- este script
+--   1. docker compose up -d          (levanta MySQL; no hace falta una base previa)
+--   2. Ejecutar este archivo en DBeaver contra el servidor MySQL  <-- este script
+--      Crea la base optica_y_fotonica (si no existe) y sus 9 tablas vacias.
+--      No es necesario estar conectado a una base ya creada.
 --   3. Ejecutar notebooks/05_pipeline_etl_mysql.ipynb            (puebla las tablas)
 --
 -- El script es RECONSTRUIBLE DESDE CERO: puede ejecutarse cuantas veces se
@@ -23,7 +25,13 @@
 --                                            y docs/RESULTADOS_exploracion_y_limpieza.md
 -- ============================================================================
 
-USE db_prueba;
+-- Esta base NO depende de MYSQL_DATABASE ni de ninguna base preexistente.
+-- CREATE DATABASE es idempotente: se puede reejecutar el script desde cero.
+CREATE DATABASE IF NOT EXISTS optica_y_fotonica
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+USE optica_y_fotonica;
 
 -- ----------------------------------------------------------------------------
 -- 0. Limpieza previa (permite reconstruir el esquema desde cero)

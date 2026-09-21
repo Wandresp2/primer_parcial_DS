@@ -31,7 +31,19 @@ docker compose up -d
 
 3. Abre JupyterLab en [http://localhost:8888](http://localhost:8888) con el token de `.env` (`JUPYTER_TOKEN`, por defecto `facil123`).
 
-4. Comprueba el estado:
+4. Crea la base de datos del proyecto y sus tablas ejecutando `sql/schema.sql` en DBeaver (conectado al servidor MySQL, sin necesidad de una base previa). El script hace `CREATE DATABASE optica_y_fotonica` y luego las 9 tablas vacias. Equivalente por terminal:
+
+```bash
+docker exec -i mysql_container mysql -uroot -proot < sql/schema.sql
+```
+
+En PowerShell, si la redireccion `<` falla:
+
+```powershell
+Get-Content sql/schema.sql -Raw | docker exec -i mysql_container mysql -uroot -proot
+```
+
+5. Comprueba el estado:
 
 ```bash
 docker compose ps
@@ -44,10 +56,12 @@ Compose reutiliza las imagenes locales `mysql:8.4` y `quay.io/jupyter/scipy-note
 | Variable | Valor |
 |---|---|
 | `MYSQL_ROOT_PASSWORD` | `root` |
-| `MYSQL_DATABASE` | `db_prueba` |
+| `MYSQL_DATABASE` | `optica_y_fotonica` |
 | `JUPYTER_TOKEN` | `facil123` |
 
 Nota: en la imagen oficial de MySQL, `MYSQL_USER` no puede ser `root`. Para root usa solo `MYSQL_ROOT_PASSWORD`.
+
+La base de trabajo del proyecto es **`optica_y_fotonica`**. La crea `sql/schema.sql`; el pipeline ETL y los notebooks se conectan a esa base, no a `db_prueba`.
 
 ## Conexion desde un notebook
 
@@ -65,7 +79,7 @@ conn = mysql.connector.connect(
     port=3306,
     user="root",
     password="root",
-    database="db_prueba",
+    database="optica_y_fotonica",
 )
 
 cursor = conn.cursor()
