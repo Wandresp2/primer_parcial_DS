@@ -2,6 +2,8 @@
 
 Stack de dos contenedores conectados por una red Docker que Compose crea automaticamente (`jupyter_mysql`, driver `bridge`). Desde un notebook se consulta MySQL usando el nombre del servicio (`mysql`), no `localhost`.
 
+Las credenciales estan fijas directamente en `docker-compose.yml` (sin archivo `.env`): no hay ningun paso de configuracion previo, solo levantar el stack.
+
 ## Requisitos
 
 - Docker Desktop encendido
@@ -11,27 +13,15 @@ No necesitas crear la red a mano: Compose la crea al levantar el stack.
 
 ## Arranque
 
-1. Copia las variables de entorno (solo la primera vez):
-
-```bash
-cp .env.example .env
-```
-
-En Windows PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-2. Levanta los servicios (crea red, volumen y contenedores):
+1. Levanta los servicios (crea red, volumen y contenedores):
 
 ```bash
 docker compose up -d
 ```
 
-3. Abre JupyterLab en [http://localhost:8888](http://localhost:8888) con el token de `.env` (`JUPYTER_TOKEN`, por defecto `facil123`).
+2. Abre JupyterLab en [http://localhost:8888](http://localhost:8888) con el token `facil123` (definido en `docker-compose.yml`).
 
-4. Crea la base de datos del proyecto y sus tablas ejecutando `sql/schema.sql` en DBeaver (conectado al servidor MySQL, sin necesidad de una base previa). El script hace `CREATE DATABASE optica_y_fotonica` y luego las 9 tablas vacias. Equivalente por terminal:
+3. Crea la base de datos del proyecto y sus tablas ejecutando `sql/schema.sql` en DBeaver (conectado al servidor MySQL, sin necesidad de una base previa). El script hace `CREATE DATABASE optica_y_fotonica` y luego las 9 tablas vacias. Equivalente por terminal:
 
 ```bash
 docker exec -i mysql_container mysql -uroot -proot < sql/schema.sql
@@ -43,7 +33,9 @@ En PowerShell, si la redireccion `<` falla:
 Get-Content sql/schema.sql -Raw | docker exec -i mysql_container mysql -uroot -proot
 ```
 
-5. Comprueba el estado:
+4. Ejecuta los notebooks en orden desde JupyterLab (carpeta `notebooks/`): `02_exploracion_caracterizacion_datos.ipynb` → `03_limpieza_datos.ipynb` → `04_pipeline_etl_mysql.ipynb` (puebla las 9 tablas) → `05_consultas_analisis_cientifico.ipynb`.
+
+5. Comprueba el estado de los contenedores:
 
 ```bash
 docker compose ps
@@ -51,7 +43,7 @@ docker compose ps
 
 Compose reutiliza las imagenes locales `mysql:8.4` y `quay.io/jupyter/scipy-notebook:latest` si ya las tienes; si no, las descarga.
 
-## Credenciales por defecto (`.env.example`)
+## Credenciales (fijas en `docker-compose.yml`)
 
 | Variable | Valor |
 |---|---|
@@ -61,7 +53,7 @@ Compose reutiliza las imagenes locales `mysql:8.4` y `quay.io/jupyter/scipy-note
 
 Nota: en la imagen oficial de MySQL, `MYSQL_USER` no puede ser `root`. Para root usa solo `MYSQL_ROOT_PASSWORD`.
 
-La base de trabajo del proyecto es **`optica_y_fotonica`**. La crea `sql/schema.sql`; el pipeline ETL y los notebooks se conectan a esa base, no a `db_prueba`.
+La base de trabajo del proyecto es **`optica_y_fotonica`**. La crea `sql/schema.sql`; el pipeline ETL y los notebooks se conectan a esa base.
 
 ## Conexion desde un notebook
 
@@ -89,7 +81,7 @@ cursor.close()
 conn.close()
 ```
 
-Si cambias el `.env`, actualiza tambien estas credenciales en el notebook.
+Si cambias las credenciales en `docker-compose.yml`, actualiza tambien estos valores en los notebooks.
 
 ## Persistencia
 
@@ -109,3 +101,14 @@ docker compose down -v
 ```
 
 No uses `-v` si quieres conservar los datos.
+
+## Estructura del proyecto
+
+```
+docker-compose.yml          Definicion de los dos contenedores (MySQL + JupyterLab)
+sql/schema.sql               DDL: crea la base y las 9 tablas + 1 vista, vacias
+notebooks/                   02 a 05: exploracion, limpieza, ETL y consultas SQL
+  datos_originales/          CSV crudos del NIST, sin modificar (evidencia de la fuente)
+  datos_procesados/          CSV limpios, generados por los notebooks
+docs/                        Documentacion tecnica de cada etapa (02 a 05)
+```
