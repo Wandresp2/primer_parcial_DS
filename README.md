@@ -67,7 +67,7 @@ La base de trabajo del proyecto es **`optica_y_fotonica`**. La crea `sql/schema.
 
 Host: `mysql` (nombre del servicio en `docker-compose.yml`). Puerto: `3306`.
 
-Hay un notebook de prueba en `notebooks/conexion_mysql.ipynb`. Ejemplo:
+Hay un notebook de prueba en `notebooks/conexion_mysql.ipynb`. Las consultas SQL y la respuesta a la pregunta cientifica estan en `notebooks/06_consultas_analisis_cientifico.ipynb`. Ejemplo:
 
 ```python
 %pip install mysql-connector-python
