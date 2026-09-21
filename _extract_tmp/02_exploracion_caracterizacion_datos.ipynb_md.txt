@@ -1,0 +1,440 @@
+===== CELL 0 MARKDOWN =====
+# Notebook 2 — Obtención, Caracterización y Exploración de Datos
+## Fuente: NIST Atomic Spectra Database (ASD)
+## Proyecto: Óptica y Fotónica — Primer Parcial
+
+**Estudiante:** Perez Criollo Andres David
+**Formulario de líneas:** https://physics.nist.gov/PhysRefData/ASD/lines_form.html
+**Formulario de niveles:** https://physics.nist.gov/PhysRefData/ASD/levels_form.html
+**Endpoints:** `lines1.pl` (líneas espectrales) y `energy1.pl` (niveles de energía)
+
+---
+
+### Pregunta científica que orienta todo el análisis
+
+> **¿Cómo se distribuyen las líneas espectrales de los primeros diez elementos de la tabla
+> periódica (H a Ne) a lo largo del espectro electromagnético, y qué relación existe entre
+> la probabilidad de transición espontánea (coeficiente de Einstein Aki) y la longitud de
+> onda de emisión en cada elemento?**
+
+De esta pregunta se desprende el criterio de prioridad que se usará durante todo el
+diagnóstico:
+
+| Prioridad | Variables | Razón |
+|---|---|---|
+| **Críticas** | longitud de onda, `Aki`, elemento/espectro, energías de nivel | Son las que responden directamente la pregunta |
+| Secundarias | incertidumbres, referencias bibliográficas, *leading percentages*, factor de Landé | Documentan y enriquecen, pero su ausencia no impide responder |
+
+---
+
+### Alcance de este notebook
+
+Este notebook cubre los puntos **2, 3 y el diagnóstico previo al 4** del enunciado:
+
+1. **Obtención** de las dos fuentes desde la API oficial del NIST, guardando los archivos
+   planos originales sin modificar.
+2. **Caracterización** de cada fuente: qué columnas trae, qué tipo de dato tiene cada una,
+   qué significa físicamente.
+3. **Exploración y diagnóstico**: tipos incorrectos, valores faltantes, duplicados,
+   inconsistencias, distribuciones, rangos y valores atípicos.
+4. **Construcción del tercer dataset** (`df_analysis`) que une líneas y niveles.
+
+**Lo que este notebook NO hace:** no limpia los datos. La limpieza se **propone y se
+justifica** en el documento `docs/PLAN_limpieza_datos.md`, redactado a partir de los
+hallazgos reales de este notebook, y se **ejecuta** en la etapa siguiente del proyecto.
+
+**Lo que este notebook NO toca:** no crea bases de datos, no escribe en MySQL y no modifica
+la infraestructura Docker. Todo el cómputo ocurre dentro del contenedor `jupyter`.
+
+---
+
+### Las dos fuentes son complementarias, no independientes
+
+Cada **línea espectral** es el salto de un electrón entre dos **niveles de energía**: uno
+inferior y uno superior. El archivo de líneas trae información parcial embebida de esos dos
+niveles (configuración, término, energía), mientras que el archivo de niveles trae
+información que el de líneas no tiene (incertidumbre del nivel, factor de Landé-g, leading
+percentages, identificadores internos). Por eso en la Sección 11 se unen ambos.
+
+===== CELL 1 MARKDOWN =====
+---
+# Sección 1 — Librerías y configuración del entorno
+
+La imagen `quay.io/jupyter/scipy-notebook` ya incluye `pandas`, `numpy`, `matplotlib` y
+`seaborn`. En lugar de un `!pip install` incondicional (que reinstala en cada ejecución y
+no persiste al recrear el contenedor), se **verifica** qué hay y solo se instala lo que
+falte.
+
+===== CELL 4 MARKDOWN =====
+---
+# Sección 2 — Obtención de los datos
+
+Se unifica aquí la descarga documentada en
+`01_descarga_datos_iniciales.ipynb` (líneas y niveles), de modo que
+este notebook sea **autocontenido**: se puede abrir y correr de arriba a abajo sin depender
+de que otro notebook se haya ejecutado antes.
+
+### Estrategia de caché
+
+Descargar los niveles exige **18 peticiones** al NIST (el formulario de niveles solo acepta
+un espectro por consulta) más 1 petición para las líneas: 19 en total. Volver a pedirlas en
+cada ejecución sería lento y descortés con un servidor público.
+
+Por eso se usa una caché en disco: si el archivo crudo ya existe en `datos_originales/`, se
+lee de ahí; si no, se descarga y se guarda. El archivo guardado es **el texto crudo tal como
+lo devolvió el NIST**, sin ninguna modificación, que es la evidencia de la fuente oficial
+que exige la rúbrica.
+
+Para forzar una descarga nueva basta con poner `FORZAR_DESCARGA = True`.
+
+===== CELL 6 MARKDOWN =====
+## 2.1 — Líneas espectrales (`lines1.pl`)
+
+Los parámetros replican exactamente las opciones del formulario web. Se conserva la
+documentación parámetro por parámetro del notebook 01, porque justificar **por qué** se pidió
+cada campo es parte del entregable.
+
+Se añade un intento de traer los **identificadores internos de nivel** (`show_level_ids`).
+El formulario de líneas los ofrece y serían la clave de unión ideal con el archivo de
+niveles (que ya los pide vía `show_level_id`). El notebook **no asume que funcionen**: la
+Sección 11 verifica contra las columnas realmente devueltas y, si no llegaron, elige otra
+estrategia de unión.
+
+===== CELL 9 MARKDOWN =====
+### Inspección del texto crudo *antes* de parsear
+
+Este paso es parte de la caracterización, no un trámite. La exportación CSV del NIST suele
+traer artefactos de formato (comillas, prefijos pensados para que Excel no reinterprete los
+valores, separadores intercalados). Verlos **antes** de que `read_csv` los convierta en
+columnas evita diagnosticar mal los tipos de dato más adelante: una columna que parece
+"texto sucio" puede en realidad ser numérica envuelta en un artefacto de exportación.
+
+===== CELL 12 MARKDOWN =====
+## 2.2 — Niveles de energía (`energy1.pl`)
+
+El formulario de niveles solo acepta **un espectro por petición**, así que se itera sobre
+los 18 espectros. Cada respuesta cruda se guarda como archivo individual en
+`datos_originales/niveles/` y al final se consolidan en un solo DataFrame, agregando una
+columna `espectro` que permite distinguir a qué elemento pertenece cada nivel una vez
+unidos.
+
+Entre peticiones se deja una pausa de 1 segundo: es buena práctica al consumir una API
+pública. La pausa solo se aplica cuando la descarga es real, no cuando se lee de caché.
+
+===== CELL 17 MARKDOWN =====
+## 2.3 — Decodificación del formato de exportación
+
+**Este es el hallazgo más importante de toda la obtención de datos, y condiciona todo lo
+que viene después.**
+
+La inspección del texto crudo reveló que el NIST no exporta los valores en limpio, sino
+**envueltos** en un artefacto pensado para que Excel no reinterprete los datos. Después de
+que `pandas` parsea el CSV, un valor numérico no queda como `91.2323660` sino como el texto
+literal `="91.2323660"`, y —crucialmente— **un dato ausente no queda como `NaN`, sino como
+el texto `=""`**.
+
+Esto tiene dos consecuencias graves si se ignora:
+
+1. **Todas las columnas quedan como `object` (texto)**, incluidas longitud de onda y `Aki`.
+   No se podría calcular ni una media.
+2. **`isnull()` devolvería cero nulos en todo el dataset**, porque `=""` es una cadena de
+   texto perfectamente válida, no un valor ausente. El análisis de faltantes daría un
+   resultado falso y tranquilizador.
+
+### ¿Decodificar es limpiar?
+
+No. Conviene ser preciso, porque la distinción importa para el alcance de este notebook:
+
+- **Decodificar** es deshacer el envoltorio del formato de exportación para recuperar el
+  valor que el NIST realmente quiso transmitir. Es equivalente a descomprimir un archivo:
+  no altera la información, la hace legible. `="91.23"` y `91.23` **son el mismo dato**.
+- **Limpiar** es tomar decisiones sobre el contenido: imputar, descartar, corregir. Eso
+  **no** se hace aquí.
+
+Sin decodificar sería imposible diagnosticar nada. Por eso se hace ya, y se conservan los
+DataFrames crudos (`df_lines_raw`, `df_levels_raw`) para poder demostrar el contraste en la
+Sección 4.
+
+===== CELL 20 MARKDOWN =====
+## 2.4 — Registro de procedencia
+
+Documentar de dónde salió cada archivo, cuándo y con qué tamaño es parte del requisito de
+reproducibilidad: cualquier persona debe poder rastrear cada dato hasta su fuente oficial.
+
+===== CELL 23 MARKDOWN =====
+---
+# Sección 3 — Primera inspección de cada fuente por separado
+
+Antes de unir nada, se revisa cada fuente de manera independiente. El objetivo es responder:
+**¿de qué está hecho este dataset?** Esto corresponde al "paso 1" de la metodología de los
+ejemplos de clase: conocer toda la información general del dataset antes de tocarlo.
+
+Primero se definen unos ayudantes que se usarán durante todo el notebook. El más importante
+es `buscar_columna`: los nombres exactos de las columnas del NIST dependen de los parámetros
+de la consulta, así que en lugar de escribirlos a mano (lo que rompería el notebook si el
+NIST cambia una etiqueta) se **localizan por patrón** y se imprime el mapeo encontrado.
+
+===== CELL 25 MARKDOWN =====
+## 3.1 — Líneas espectrales: forma y contenido
+
+===== CELL 30 MARKDOWN =====
+## 3.2 — Niveles de energía: forma y contenido
+
+===== CELL 35 MARKDOWN =====
+## 3.3 — Mapeo semántico de columnas
+
+Se localizan las columnas clave por patrón y se imprime el resultado. Este mapeo es el que
+usan todas las secciones siguientes, de modo que si el NIST devuelve una etiqueta distinta
+a la esperada, el problema se ve **aquí**, explícito, en vez de reventar 20 celdas después.
+
+===== CELL 38 MARKDOWN =====
+### Significado físico de las columnas
+
+Interpretación de lo que devolvió el NIST, necesaria para poder decidir después qué se puede
+imputar y qué no:
+
+**Líneas espectrales** — cada fila es una **transición electrónica**:
+
+| Columna | Significado | Rol frente a la pregunta científica |
+|---|---|---|
+| `element`, `sp_num` | Elemento químico y estado de ionización (1 = neutro, 2 = una vez ionizado) | **Crítica** — es la variable de agrupación |
+| `obs_wl_*(nm)` | Longitud de onda **medida** en laboratorio | **Crítica** — eje X de la pregunta |
+| `ritz_wl_*(nm)` | Longitud de onda **calculada** a partir de la diferencia de niveles | **Crítica** — respaldo cuando no hay medición |
+| `unc_obs_wl`, `unc_ritz_wl` | Incertidumbre de cada longitud de onda | Secundaria — mide calidad del dato |
+| `intens` | Intensidad relativa (brillo) de la línea | Secundaria — escala arbitraria por espectro |
+| `Aki(s^-1)` | **Coeficiente de Einstein**: probabilidad de emisión espontánea | **Crítica** — eje Y de la pregunta |
+| `Acc` | Código de exactitud del NIST para `Aki` (AAA, AA, A+, A, B+, B, C, D, E) | Secundaria — categórica ordinal |
+| `Ei`, `Ek` (cm⁻¹) | Energía del nivel **inferior** y **superior** de la transición | **Crítica** — define la física del salto |
+| `conf_i/term_i/J_i` | Identidad cuántica del nivel inferior | **Crítica** — clave de unión con niveles |
+| `conf_k/term_k/J_k` | Identidad cuántica del nivel superior | **Crítica** — clave de unión con niveles |
+| `Type` | Tipo de transición: vacío = permitida (E1); `M1`, `E2`… = prohibida | Importante — explica valores extremos de `Aki` |
+| `tp_ref`, `line_ref` | Referencias bibliográficas | Secundaria — trazabilidad |
+
+**Niveles de energía** — cada fila es un **estado cuántico** del átomo:
+
+| Columna | Significado | Rol |
+|---|---|---|
+| `espectro` | Añadida por nosotros al consolidar: a qué elemento/ion pertenece el nivel | **Crítica** — sin ella los 18 archivos serían indistinguibles |
+| `Configuration` | Configuración electrónica (ej. `1s2.2s2.2p`) | **Crítica** — clave de unión |
+| `Term` | Término espectroscópico (ej. `2P*`, `3D`) | **Crítica** — clave de unión |
+| `J` | Momento angular total | **Crítica** — clave de unión y base de `g = 2J+1` |
+| `g` | Degeneración estadística del nivel | Importante |
+| `Level (eV)` | Energía del nivel **en eV** (las líneas la traen en cm⁻¹) | **Crítica** — requiere conversión para cruzar |
+| `Uncertainty (eV)` | Incertidumbre de la energía | Secundaria |
+| `Landé-g` | Respuesta del nivel a un campo magnético (efecto Zeeman) | Secundaria |
+| `Leading percentages` | Composición de la función de onda en niveles mezclados | Secundaria |
+| `Reference` | Fuente bibliográfica del nivel | Secundaria |
+
+===== CELL 39 MARKDOWN =====
+---
+# Sección 4 — Verificación de tipos de dato contra el contenido real
+
+El tipo que `pandas` asigna automáticamente **no siempre es el correcto**. En los ejemplos
+de clase, la columna `User_Score` aparecía como `object` porque contenía el texto `tbd` entre
+los números; ese único valor arruinaba toda la columna.
+
+Aquí se hace lo mismo pero de forma sistemática: para cada columna se intenta la conversión
+a número **en seco** (sin asignar nada) y se cuenta cuántos valores se perderían. Además se
+distingue entre dos causas distintas de fallo:
+
+- **Artefacto de formato**: el valor es numérico pero viene envuelto (`="123"`). Es un
+  problema de exportación, trivial de resolver.
+- **Contenido realmente no numérico**: símbolos del NIST que marcan datos dudosos o
+  estimados. Esos sí exigen una decisión de limpieza justificada.
+
+Se muestran los **valores ofensivos reales**, no solo el conteo, porque saber *qué* texto
+rompe la columna es lo que permite decidir después si se descarta, se convierte o se
+reinterpreta.
+
+===== CELL 44 MARKDOWN =====
+### Columnas categóricas: valores únicos
+
+Se inspeccionan con `.unique()` para detectar variantes de escritura, espacios sobrantes,
+mayúsculas inconsistentes o códigos no documentados — el equivalente a haber descubierto la
+categoría obsoleta `K-A` en el ejemplo de clase.
+
+===== CELL 48 MARKDOWN =====
+## 4.1 — Vistas de diagnóstico numérico
+
+Las secciones 6 a 11 necesitan trabajar con números: no se puede hacer un histograma de
+`Aki` si la columna es texto. Por eso se construyen dos **vistas de diagnóstico**,
+`df_lines_num` y `df_levels_num`, donde las columnas identificadas como numéricas se
+convierten con `pd.to_numeric(errors='coerce')`.
+
+**Esto no es la limpieza del proyecto.** Es una vista auxiliar para poder diagnosticar, y se
+declara explícitamente:
+
+- Los DataFrames originales `df_lines` y `df_levels` **quedan intactos**.
+- Las vistas no se exportan a disco.
+- Cada valor que se pierde en la conversión **queda contabilizado** abajo, y ese conteo es
+  precisamente uno de los insumos del plan de limpieza.
+
+===== CELL 51 MARKDOWN =====
+---
+# Sección 5 — Análisis de valores faltantes
+
+Se replica el patrón de los ejemplos de clase: contar los nulos, calcular su porcentaje y
+unir ambas métricas en una sola tabla con `pd.concat([total, porcentaje], axis=1)`,
+ordenada de mayor a menor.
+
+Se analiza sobre los DataFrames **originales**, porque lo que interesa aquí es cuánta
+información falta realmente en la fuente, no cuánta se perdió en una conversión.
+
+===== CELL 56 MARKDOWN =====
+### Faltantes por espectro
+
+Este cruce es específico de este proyecto y no aparece en los ejemplos de clase, pero es
+necesario: la pregunta científica **compara elementos entre sí**. Si un elemento tiene `Aki`
+ausente en la mayoría de sus líneas, cualquier comparación entre elementos quedaría sesgada
+por la cobertura del catálogo y no por la física.
+
+===== CELL 60 MARKDOWN =====
+---
+# Sección 6 — Estadística descriptiva
+
+`describe()` sobre las numéricas y `describe(include='O')` sobre las categóricas. Como en el
+ejemplo de clase, el objetivo no es solo ver medias: es **detectar valores sospechosos antes
+de graficar nada**. Ahí, un máximo de 10665 frente a un percentil 75 de 81 delató los
+outliers de `User_Count` sin necesidad de un solo gráfico.
+
+===== CELL 67 MARKDOWN =====
+---
+# Sección 7 — Inconsistencias, duplicados y validación física
+
+Además de los chequeos estándar de duplicados, aquí se aplica algo que un dataset genérico
+no permite: **validar contra las leyes físicas**. Una longitud de onda negativa o una
+transición cuyo nivel superior tiene menos energía que el inferior no son "outliers
+estadísticos": son imposibles, y por lo tanto errores de dato inequívocos.
+
+Los umbrales no se inventan de antemano: se calculan los rangos reales y se contrastan con
+lo que la física permite.
+
+===== CELL 75 MARKDOWN =====
+---
+# Sección 8 — Distribución de las variables
+
+Para cada variable numérica relevante se estudia la **forma** de su distribución. Esto no es
+decorativo: la elección entre imputar con media o con mediana depende directamente de si la
+distribución es simétrica o sesgada, y esa decisión se toma mirando estos gráficos, tal como
+en el ejemplo de clase.
+
+**Sobre la escala logarítmica:** `Aki` varía en muchos órdenes de magnitud (de ~10⁻⁵ a ~10⁹
+s⁻¹). En escala lineal, su histograma es una sola barra pegada al cero y no informa nada.
+Por eso se grafica en log.
+
+===== CELL 81 MARKDOWN =====
+### El gráfico que ataca directamente la pregunta científica
+
+Dispersión de **longitud de onda frente a Aki**, coloreada por elemento y en escala log-log.
+Es la visualización que conecta las dos variables de la pregunta.
+
+===== CELL 83 MARKDOWN =====
+### Región espectral
+
+Se deriva una variable de **diagnóstico** que clasifica cada línea en UV / visible / IR. No
+es una transformación de limpieza: es la manera de responder la primera mitad de la pregunta
+científica ("cómo se distribuyen a lo largo del espectro electromagnético").
+
+===== CELL 86 MARKDOWN =====
+### Aclaración: no aplica análisis de series temporales
+
+Los datos del NIST ASD **no tienen componente temporal**. No son mediciones repetidas en el
+tiempo, sino **propiedades atómicas fijas**: la longitud de onda de la línea Hα del
+hidrógeno es la misma hoy que hace un siglo. Las únicas fechas asociadas son las de las
+publicaciones bibliográficas, que describen *cuándo se midió*, no *cómo evoluciona el
+fenómeno*.
+
+Por eso no se construye ninguna serie temporal: hacerlo sería forzar un gráfico sin
+significado físico. Se documenta explícitamente esta decisión en lugar de omitirla.
+
+===== CELL 87 MARKDOWN =====
+---
+# Sección 9 — Rango de las variables y detección de valores atípicos
+
+Se aplica el método del **rango intercuartílico (IQR)** igual que en el ejemplo de clase:
+
+```
+q1 = df[col].quantile(0.25)
+q3 = df[col].quantile(0.75)
+iqr = q3 - q1
+bigote_inferior = q1 - 1.5 * iqr
+bigote_superior = q3 + 1.5 * iqr
+outliers = df[(df[col] < bigote_inferior) | (df[col] > bigote_superior)]
+```
+
+**Diferencia crucial respecto al ejemplo de clase:** allí un outlier de `User_Count` era
+plausiblemente un error. Aquí, en física atómica, un valor atípico suele ser una **transición
+real pero poco común** — una línea muy débil, muy energética o prohibida. Por eso en esta
+sección **no se elimina ni se imputa nada**: solo se cuantifica y se inspeccionan casos
+concretos, para poder argumentar en el plan de limpieza qué se conserva y qué no.
+
+===== CELL 92 MARKDOWN =====
+---
+# Sección 10 — Relaciones entre variables
+
+Matriz de correlación y cruces categóricos. Se incluye `log10(Aki)` además de `Aki` crudo
+porque la correlación de Pearson mide relación **lineal**: sobre una variable que abarca
+nueve órdenes de magnitud, el coeficiente sobre el valor crudo está dominado por unos pocos
+valores extremos y no describe la relación real.
+
+===== CELL 98 MARKDOWN =====
+---
+# Sección 11 — Construcción de `df_analysis`: la unión de las dos fuentes
+
+Esta es la sección donde se construye el **tercer dataset**. El plan del proyecto dejó
+deliberadamente abierta la elección de la clave de unión, porque no se puede decidir sin ver
+las columnas reales. Aquí no se elige una a ciegas: se **prueban varias estrategias y se
+mide la cobertura de cada una**, y se adopta la mejor.
+
+### Un detalle físico que cambia el diseño del merge
+
+Cada línea espectral es un salto entre **dos** niveles: el inferior y el superior. Por lo
+tanto la unión correcta no es un solo `merge`, sino **dos**: la tabla de niveles se une una
+vez como nivel inferior (sufijo `_inf`) y otra vez como nivel superior (sufijo `_sup`). Así
+cada fila de `df_analysis` describe la transición completa con las propiedades de sus dos
+extremos.
+
+### Y una advertencia sobre el modelo relacional
+
+`df_analysis` es una **herramienta de diagnóstico de esta etapa, no el diseño final de la
+base de datos**. Una tabla ancha repite los datos completos de los dos niveles en cada línea,
+que es justamente la redundancia que el modelo relacional debe evitar. La regla es: **unir
+para explorar, separar para modelar**. Los tres DataFrames se conservan por separado.
+
+===== CELL 104 MARKDOWN =====
+### Unicidad de la clave: el riesgo de duplicar filas
+
+Antes de unir hay que comprobar que la clave identifica **un solo** nivel dentro de cada
+espectro. Si no lo hace, `merge` generaría una fila por cada coincidencia y el dataset de
+líneas se inflaría artificialmente — un error silencioso que falsearía todos los conteos
+posteriores.
+
+===== CELL 114 MARKDOWN =====
+---
+# Sección 12 — Diagnóstico consolidado
+
+Resumen de todo lo encontrado. Este bloque es el **insumo directo** del documento
+`docs/PLAN_limpieza_datos.md`: cada decisión de limpieza propuesta allí debe poder
+rastrearse hasta una cifra de esta sección.
+
+===== CELL 116 MARKDOWN =====
+---
+## Conclusión de esta etapa y siguiente paso
+
+Este notebook deja tres productos:
+
+1. Los **archivos originales sin modificar** en `datos_originales/`, que son la evidencia de
+   la fuente oficial.
+2. Un **diagnóstico completo** de ambas fuentes: tipos, faltantes, duplicados, violaciones
+   físicas, distribuciones, rangos, atípicos y correlaciones.
+3. El **tercer dataset `df_analysis`**, construido con una clave de unión elegida por
+   evidencia empírica y validada cruzando las energías de las dos fuentes.
+
+**No se limpió ningún dato aquí.** Ese era el objetivo: diagnosticar primero, decidir
+después, con criterio y no por reflejo.
+
+El siguiente paso es el documento **`docs/PLAN_limpieza_datos.md`**, que toma cada hallazgo
+de la Sección 12 y propone —con justificación— qué hacer con él: qué columnas descartar, cuáles
+imputar y con qué estadístico, qué atípicos conservar por ser física legítima y cuáles tratar
+como error, y en qué orden ejecutar todo. Ese plan es el insumo de la etapa de limpieza y,
+tras ella, del diseño del modelo relacional.

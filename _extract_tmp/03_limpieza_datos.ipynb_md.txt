@@ -1,0 +1,393 @@
+===== CELL 0 MARKDOWN =====
+# Notebook 3 — Limpieza y Transformación de los Datos
+## Fuente: NIST Atomic Spectra Database (ASD)
+## Proyecto: Óptica y Fotónica — Primer Parcial
+
+**Estudiante:** Perez Criollo Andres David
+**Entrada:** `datos_originales/` (archivos crudos, **nunca se modifican**)
+**Salida:** `datos_procesados/`
+**Plan que se ejecuta:** `docs/PLAN_limpieza_datos.md` (decisiones L1 … L14)
+**Diagnóstico de partida:** `notebooks/02_exploracion_caracterizacion_datos.ipynb`
+
+---
+
+### Pregunta científica que orienta cada decisión
+
+> **¿Cómo se distribuyen las líneas espectrales de los primeros diez elementos de la tabla
+> periódica (H a Ne) a lo largo del espectro electromagnético, y qué relación existe entre
+> la probabilidad de transición espontánea (coeficiente de Einstein Aki) y la longitud de
+> onda de emisión en cada elemento?**
+
+---
+
+### El principio que gobierna toda esta limpieza
+
+> **En un dataset científico, un valor ausente es información.**
+
+Que el NIST no haya medido el `Aki` de una línea no es un hueco que haya que tapar: es un
+hecho sobre el estado del conocimiento experimental. Por eso esta limpieza es
+**deliberadamente conservadora**:
+
+- **No se imputa ni un solo valor** en las variables críticas (longitud de onda, `Aki`,
+  energías, elemento).
+- **No se elimina ningún valor atípico**: en física atómica un atípico estadístico suele ser
+  una transición real pero poco común.
+- Solo se eliminan **2 filas** en todo el proceso, y no son observaciones sino cabeceras
+  incrustadas.
+- Solo se descartan **4 columnas**, todas secundarias y con más del 69 % de ausencias.
+
+La ganancia no viene de rellenar huecos, sino de **decodificar correctamente** el formato e
+**interpretar la notación** propia del NIST.
+
+---
+
+### Qué se encontró en la exploración (resumen de entrada)
+
+| Hallazgo | Cifra |
+|---|---|
+| Valores ausentes escondidos tras el envoltorio `="..."` | **80 697** (66 509 en líneas + 14 188 en niveles) |
+| Filas con longitud de onda medida en **aire** mezcladas con las de vacío | **10 428** de 18 288 |
+| Valores no convertibles por la notación propia del NIST | 28 020 en líneas |
+| Valores **físicamente imposibles** | **0** |
+| Filas exactamente duplicadas | **0** |
+| Cumplimiento de `g = 2J + 1` | **100 %** |
+
+**El dataset no está sucio: está codificado.**
+
+===== CELL 1 MARKDOWN =====
+---
+# Sección 1 — Carga de los datos originales
+
+Los archivos de `datos_originales/` se abren **en modo lectura** y no se modifican en ningún
+momento. Son la evidencia de la fuente oficial que exige la rúbrica, y todo el proceso debe
+poder reconstruirse a partir de ellos.
+
+No hay peticiones de red en este notebook: la descarga ya ocurrió y quedó documentada en el
+notebook 02.
+
+===== CELL 3 MARKDOWN =====
+### Ayudantes reutilizados del notebook 02
+
+Son las mismas funciones que se validaron durante la exploración. Se repiten aquí para que
+este notebook sea autocontenido y pueda ejecutarse sin depender del anterior.
+
+**Atención a un detalle de `pandas` 3:** la guarda para saltar columnas numéricas debe ser
+`pd.api.types.is_numeric_dtype(...)` y **no** `col.dtype != object`. En pandas 3 las columnas
+de texto tienen un dtype `str` propio, así que la comparación contra `object` las excluiría
+por error y dejaría el envoltorio intacto — que fue exactamente el error que se detectó y
+corrigió durante la exploración.
+
+===== CELL 5 MARKDOWN =====
+## 1.1 — Reconstrucción del medio (aire / vacío) desde el archivo crudo
+
+**Este paso tiene que ocurrir durante la carga, antes de filtrar o reordenar nada**, porque
+la única forma de saber en qué medio se midió cada línea es **la posición que ocupa en el
+archivo original**.
+
+La exploración reveló que la respuesta del NIST no es un único bloque, sino **tres**, cada
+uno con su propia cabecera:
+
+| Bloque | Filas | Cabecera | Medio |
+|---|---|---|---|
+| 1 | 3 689 | `obs_wl_vac(nm)` | vacío |
+| 2 | **10 428** | `obs_wl_air(nm)` | **aire** |
+| 3 | 4 171 | `obs_wl_vac(nm)` | vacío |
+
+Como `pandas` solo interpreta la primera cabecera, las otras dos quedaron **incrustadas como
+filas de datos** y las 10 428 mediciones en aire terminaron bajo una columna llamada
+`obs_wl_vac(nm)`. Es el defecto más silencioso del dataset: no produce ningún error, produce
+una columna que *parece* homogénea y no lo es.
+
+===== CELL 8 MARKDOWN =====
+---
+# Sección 2 — L3: decodificar el envoltorio de exportación
+
+Se adelanta este paso porque **hasta que no se haga, los valores ausentes son invisibles** y
+ninguna otra decisión es evaluable.
+
+El NIST exporta cada valor envuelto como `="valor"` para que Excel no lo reinterprete. Tras
+el parseo eso deja dos problemas:
+
+1. Todas las columnas quedan como texto, incluidas longitud de onda y `Aki`.
+2. **Un dato ausente llega como la cadena `=""`, no como `NaN`** — así que `isnull()`
+   informaría cero nulos en todo el dataset.
+
+Decodificar **no es limpiar**: es deshacer el envoltorio para recuperar el valor que el NIST
+quiso transmitir. `="91.23"` y `91.23` son el mismo dato.
+
+===== CELL 10 MARKDOWN =====
+---
+# Sección 3 — L1: eliminar las filas de cabecera incrustadas
+
+**Único paso de todo el proceso que elimina filas.** Se eliminan porque **no son
+observaciones**: son metadatos del formato que quedaron mezclados con los datos. No
+representan ninguna transición física.
+
+Se ejecuta después de asignar el medio (Sección 1.1) porque esa asignación dependía de la
+posición original de cada fila.
+
+===== CELL 12 MARKDOWN =====
+---
+# Sección 4 — L2: unificar la longitud de onda a una sola convención
+
+La longitud de onda de una línea se puede expresar **medida en el vacío** o **medida en el
+aire**, y los dos valores difieren porque el aire desvía ligeramente la luz. El NIST alterna
+entre ambas según el rango, y la mezcla quedó sin marcar.
+
+**Justificación física:** la diferencia es de ~0,03 %, pequeña pero **sistemática**. Como la
+longitud de onda es la variable central de la pregunta científica y se usa para comparar
+elementos entre sí, una columna que mezcla dos definiciones distintas **no es una variable**.
+
+**Justificación computacional:** se conserva la columna original y se **añade** una columna
+homogénea, sin destruir nada. El índice de refracción del aire en condiciones estándar es
+n = 1,00028, y la conversión es λ_vacío = λ_aire × n.
+
+===== CELL 14 MARKDOWN =====
+---
+# Sección 5 — L4: interpretar la notación del NIST en vez de descartarla
+
+**Esta es la decisión que más datos salva.**
+
+La exploración encontró 28 020 valores que `pd.to_numeric(errors='coerce')` convertiría en
+`NaN`. Pero no son basura: son **notación científica con significado**:
+
+| Símbolo | Significado | Dónde |
+|---|---|---|
+| `[186101.55]` | Energía **interpolada o teórica**, no medida experimentalmente | `Ei`, `Ek` |
+| `934593.0+x` | Energía referida a un **origen desconocido** | `Ei`, `Ek` |
+| `74.4794+` | Longitud de onda Ritz que es un **límite**, no un valor exacto | `ritz_wl` |
+| `500*`, `a*`, `a` | Banderas de intensidad (línea difusa, mezclada, autoabsorbida…) | `intens` |
+
+**Diferencia clave con el ejemplo de clase:** allí, el texto `tbd` en `User_Score` era ruido
+sin contenido y convertirlo en `NaN` era correcto. Aquí, `[186101.55]` **sí contiene la
+energía**: los corchetes informan *cómo se obtuvo*, no la anulan.
+
+Por eso, para cada símbolo se extrae **el valor numérico** y se conserva **su significado**
+en una columna aparte. Así nada se pierde y después se puede filtrar por calidad si se quiere.
+
+===== CELL 18 MARKDOWN =====
+---
+# Sección 6 — L5: convertir J de fracción a número
+
+El número cuántico **J** viene escrito como fracción (`3/2`) en cerca del 46 % de los casos.
+`pd.to_numeric` los convertiría todos en `NaN`, cuando `3/2` es simplemente 1,5.
+
+Pero hay que ser cuidadoso: la exploración de esta fase reveló que los valores **no
+resueltos** son más variados de lo esperado — además de `---` aparecen `0,1,2`, `1,2,3`,
+`2,3,4`, `1/2,3/2`, `3/2,5/2` e incluso `1/2 or 3/2`. Son casos en que el NIST **no ha
+determinado** un único valor de J.
+
+Por eso el parseo usa una **expresión regular estricta** en lugar de partir por `/`: solo
+convierte lo que es inequívocamente una fracción o un entero, y todo lo demás queda como
+no resuelto, conservando el texto original para no perder la información.
+
+===== CELL 21 MARKDOWN =====
+---
+# Sección 7 — L6: proteger los identificadores de nivel
+
+`ID_i`, `ID_k` y `Level ID` **parecen** numéricos (`006002.000001`) pero son **códigos**.
+Convertirlos a número los transforma en `6002.000001`, **destruyendo los ceros a la
+izquierda** y rompiendo la unión entre las dos fuentes.
+
+El criterio correcto no es si los valores *parsean* como número, sino si **son cantidades
+sobre las que tiene sentido calcular**. Sobre un identificador no se puede promediar.
+
+Durante la exploración este error llegó a degradar la unión; al protegerlos, la cobertura
+subió al 98,81 %.
+
+===== CELL 23 MARKDOWN =====
+---
+# Sección 8 — L7: normalizar las variables categóricas
+
+**`Type`** está vacío en el 98,17 % de las filas, pero eso **no es un dato faltante**: por
+convención del NIST, vacío significa **transición permitida (E1)**, el tipo más común. Se
+rellena con la categoría explícita `E1` para que el significado quede documentado en el dato
+en vez de escondido en una convención.
+
+Es el caso análogo al `K-A` obsoleto del ejemplo de clase: una categoría que hay que
+**entender** antes de tocarla.
+
+**`Acc`** no es texto libre: es la **escala ordinal de exactitud** del NIST, de `AAA` (la
+mejor) a `E` (la peor). Tratarla como categórica ordenada permite después filtrar por calidad
+mínima del dato.
+
+===== CELL 26 MARKDOWN =====
+---
+# Sección 9 — L8: recuperar la longitud de onda con el respaldo Ritz
+
+**La decisión de mayor impacto de toda la limpieza.**
+
+La longitud de onda **observada** falta en el 46 % de las líneas. Pero el catálogo trae una
+segunda columna, la **Ritz**, presente en el 97,8 %.
+
+**Justificación física:** la longitud de onda Ritz **no es una estimación estadística**: es el
+valor calculado a partir de la diferencia de energía entre los dos niveles del salto. Es
+física exacta. Usarla como respaldo es científicamente legítimo; imputar con la mediana de la
+columna produciría una línea espectral que no existe.
+
+**Justificación computacional:** se conserva el origen de cada valor en
+`longitud_onda_origen`, de modo que cualquier análisis posterior puede distinguir entre
+medición y cálculo, o restringirse solo a las observadas.
+
+===== CELL 28 MARKDOWN =====
+---
+# Sección 10 — L9: `Aki` no se imputa
+
+`Aki` falta en el 31 % de las líneas. **No se imputa.** Se conserva el `NaN` y se añade la
+bandera `tiene_aki`.
+
+**Aquí esta limpieza se aparta deliberadamente del ejemplo de clase.** Allí, imputar
+`User_Count` con la mediana era razonable porque el objetivo era conservar filas para un
+modelo. Aquí `Aki` **es la variable dependiente de la pregunta científica**: imputarla
+equivale a inventar la respuesta.
+
+Tres razones concretas:
+
+1. **La distribución lo prohíbe:** `Aki` abarca 35 órdenes de magnitud con asimetría 40,16.
+   Cualquier medida de centralidad es físicamente arbitraria sobre ese rango.
+2. **El ejemplo de clase mostró el desenlace:** imputar con la mediana global colapsó los
+   tres cuartiles al mismo valor y dejó la columna inservible.
+3. **El faltante es informativo:** que Ne II tenga el 87,8 % de `Aki` ausente no es ruido,
+   dice que ese ion está menos caracterizado experimentalmente. Imputarlo borraría un
+   hallazgo del trabajo.
+
+===== CELL 30 MARKDOWN =====
+---
+# Sección 11 — L10: variables derivadas para el análisis
+
+Tres variables que no existen en el origen pero que la pregunta científica necesita:
+
+- **`log10_aki`** — la correlación entre longitud de onda y `Aki` pasa de **−0,0023 en escala
+  cruda a −0,6805 en log-log**. Sin la transformación logarítmica, la relación que se busca
+  es literalmente invisible. No es un adorno: es la condición para poder responder.
+- **`region_espectral`** — clasifica cada línea en ultravioleta, visible o infrarrojo, que es
+  la primera mitad de la pregunta.
+- **`energia_foton_ev`** — la energía del fotón emitido, derivada de la diferencia entre los
+  dos niveles (1 eV = 8065,543937 cm⁻¹).
+
+===== CELL 33 MARKDOWN =====
+---
+# Sección 12 — L11: descartar las columnas sin valor informativo
+
+El criterio no es solo el porcentaje de nulos, sino **el porcentaje de nulos combinado con la
+irrelevancia para la pregunta científica**. `Ei` también tiene un 19 % de valores
+problemáticos y **no se descarta**, porque es crítica.
+
+| Columna | % nulos | Motivo |
+|---|---|---|
+| `Lande` | 99,50 % | Casi vacía, y los 29 valores presentes son estimaciones entre paréntesis |
+| `Prefix` / `Suffix` | 78,79 % / 74,03 % | Solo marcan el corchete de energía interpolada: información ya capturada como bandera |
+| `Leading percentages` | 69,38 % | Texto compuesto no estructurado, secundario para la pregunta |
+
+**Se conservan** `unc_obs_wl` (57,94 % de nulos), `tp_ref` y `line_ref` pese a su alta
+ausencia: documentan la calidad y la procedencia de cada medición, que la rúbrica exige poder
+rastrear.
+
+===== CELL 35 MARKDOWN =====
+---
+# Sección 13 — L12: duplicados — marcar, no eliminar
+
+`drop_duplicates()` no encuentra **nada** que borrar: hay 0 filas exactamente duplicadas.
+
+Pero sí hay 70 transiciones con la **misma identidad física** que aparecen más de una vez.
+Esas filas difieren en la referencia bibliográfica: son **mediciones independientes de la
+misma transición, publicadas por autores distintos**. Eso es información científica valiosa,
+no basura.
+
+**Decisión:** marcarlas con una bandera, no eliminarlas. Descartar una arbitrariamente
+significaría tirar la medición de un laboratorio sin criterio. La decisión correcta se toma
+en el modelo relacional, donde una transición podrá tener varias mediciones asociadas.
+
+===== CELL 37 MARKDOWN =====
+---
+# Sección 14 — L13: valores atípicos — conservarlos, con justificación física
+
+El método del rango intercuartílico marca **2 181 valores de `Aki` como atípicos (17,31 %)**
+y sugeriría eliminarlos. **No se elimina ninguno.**
+
+**El argumento es físico, no estadístico.** Los atípicos de `Aki` corresponden a
+**transiciones prohibidas**: emisiones mucho más lentas que las normales. El IQR las marca
+por ser minoría (1,83 % de las líneas), no por ser erróneas.
+
+El método IQR asume una distribución unimodal y de escala acotada. `Aki` abarca 35 órdenes de
+magnitud y la longitud de onda va del rayo X a las ondas de radio. Aplicarlo como regla
+automática destruiría física legítima. Se usa como **detector que obliga a mirar**, no como
+regla que decide.
+
+===== CELL 39 MARKDOWN =====
+---
+# Sección 15 — L6/L14: renombrado a `snake_case` y unión de las dos fuentes
+
+Los nombres originales del NIST (`Aki(s^-1)`, `obs_wl_vac(nm)`, `Level (eV)`) contienen
+paréntesis, acentos circunflejos y espacios que obligan a usar comillas invertidas en SQL y
+complican cualquier consulta. Se renombran a `snake_case` descriptivo y el **diccionario de
+columnas** guarda la correspondencia con el nombre original, para no perder la trazabilidad
+con la fuente oficial.
+
+Después se unen ambas fuentes por el identificador interno de nivel. El merge es **doble**,
+porque una línea espectral **es** un salto entre dos niveles: la tabla de niveles se une una
+vez como nivel inferior (`_inf`) y otra como superior (`_sup`).
+
+===== CELL 43 MARKDOWN =====
+---
+# Sección 16 — Diccionario de columnas
+
+Documenta cada columna del dataset limpio: su nombre original en el NIST, el tipo, la unidad
+y qué significa. Es lo que permite que otra persona —o el propio estudiante dentro de seis
+meses— entienda el archivo sin tener que leer el código.
+
+===== CELL 45 MARKDOWN =====
+---
+# Sección 17 — Validación final
+
+Criterios de aceptación de `docs/PLAN_limpieza_datos.md`, sección 8. Cada uno se comprueba
+automáticamente: si alguno falla, el notebook se detiene.
+
+El más importante es el **primero**: en el ejemplo de clase, imputar con la mediana global
+colapsó los tres cuartiles al mismo valor y arruinó cuatro columnas sin que nadie lo notara
+hasta revisar el `describe()` final.
+
+===== CELL 48 MARKDOWN =====
+---
+# Sección 18 — Verificación contra el esquema relacional propuesto
+
+Puente hacia la etapa siguiente **sin ejecutarla**. Antes de proponer un modelo relacional
+hay que comprobar que los datos limpios efectivamente lo soportan: que las claves primarias
+candidatas son únicas, que no hay claves foráneas huérfanas y cuántas filas tendría cada
+tabla.
+
+La propuesta completa está en `docs/PROPUESTA_modelo_relacional.md`.
+
+===== CELL 52 MARKDOWN =====
+---
+# Sección 19 — Exportación de los datos procesados
+
+Se guardan en `datos_procesados/`. **La carpeta `datos_originales/` no se toca**, de modo que
+todo el proceso pueda reconstruirse y verificarse desde la fuente.
+
+| Archivo | Para qué sirve |
+|---|---|
+| `dataset_limpio.csv` | **Entregable principal**: cada línea con sus dos niveles ya unidos |
+| `lineas_limpias.csv` | Alimenta la tabla `linea_espectral` |
+| `niveles_limpios.csv` | Alimenta `nivel_energia` — incluye los 2 201 niveles sin línea asociada |
+| `diccionario_columnas.csv` | Documentación de cada columna |
+
+===== CELL 56 MARKDOWN =====
+---
+## Conclusión de la etapa de limpieza
+
+El dataset quedó **limpio, documentado y trazable**, y con una propiedad que conviene
+subrayar para la sustentación: **no se inventó ni un solo valor**.
+
+- Se eliminaron **2 filas** (cabeceras del formato), ninguna observación real.
+- Se descartaron **4 columnas**, todas secundarias y con más del 69 % de ausencias.
+- Se imputaron **0 valores** en variables críticas.
+- Se eliminaron **0 valores atípicos**, porque resultaron ser física legítima.
+
+La ganancia vino de **decodificar bien** e **interpretar la notación del NIST**: eso, por sí
+solo, llevó la base de evidencia de 4 462 a 12 603 líneas y destapó 80 697 ausencias que
+estaban escondidas.
+
+**Siguiente paso:** `docs/PROPUESTA_modelo_relacional.md` toma este dataset y propone su
+estructura en 9 tablas normalizadas hasta 3FN, con sus claves primarias, foráneas y
+cardinalidades, que es lo que se implementará en MySQL en la etapa siguiente.

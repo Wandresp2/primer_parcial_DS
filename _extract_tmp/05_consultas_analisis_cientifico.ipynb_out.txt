@@ -1,0 +1,476 @@
+===== CELL 2 CODE SRC (first 500) =====
+import os
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+import sqlalchemy as sa
+from sqlalchemy import text
+from IPython.display import display
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+pd.set_option("display.max_columns", None)
+pd.set_option("display.width", 140)
+pd.set_option("display.max_rows", 25)
+sns.set_theme(style="whitegrid", context="notebook")
+
+DB_USER = os.environ.get("MYSQL_USER", "root")
+DB_PASS = os.environ.get("MYSQL_ROOT_PASSWORD", "root")
+DB_
+----- OUTPUT -----
+MySQL 8.4.11  |  base: optica_y_fotonica
+linea_espectral: 18,288 filas  |  nivel_energia: 5,752 filas
+Fecha: 2026-09-21 07:26:46
+
+
+===== CELL 5 CODE SRC (first 500) =====
+df_c1 = consultar('''
+SELECT
+    DATABASE()                                              AS base_datos,
+    (SELECT COUNT(*) FROM elemento)                         AS n_elementos,
+    (SELECT COUNT(*) FROM espectro)                         AS n_espectros,
+    (SELECT COUNT(*) FROM linea_espectral)                  AS n_lineas,
+    (SELECT COUNT(*) FROM nivel_energia)                    AS n_niveles,
+    (SELECT COUNT(*) FROM linea_espectral
+        WHERE aki_s1 IS NOT NULL)                      
+----- OUTPUT -----
+C1. Inventario de optica_y_fotonica
+
+          base_datos  n_elementos  n_espectros  n_lineas  n_niveles  n_con_aki  lambda_min_nm  lambda_max_nm
+0  optica_y_fotonica           10           18     18288       5752      12603         4.2767   6.064000e+10
+
+===== CELL 7 CODE SRC (first 500) =====
+df_region = consultar('''
+SELECT
+    region_espectral,
+    COUNT(*) AS n_lineas,
+    ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM v_linea_analisis), 2) AS porcentaje
+FROM v_linea_analisis
+GROUP BY region_espectral
+ORDER BY n_lineas DESC;
+''', "C2. Líneas por región del espectro (todas las líneas, con o sin Aki)")
+
+df_region_elem = consultar('''
+SELECT elemento, region_espectral, COUNT(*) AS n_lineas
+FROM v_linea_analisis
+GROUP BY elemento, region_espectral
+ORDER BY elemento, region_espectral;
+
+----- OUTPUT -----
+C2. Líneas por región del espectro (todas las líneas, con o sin Aki)
+
+   region_espectral  n_lineas  porcentaje
+0        Infrarrojo      7926       43.34
+1      Ultravioleta      6348       34.71
+2           Visible      3822       20.90
+3           Rayos X       113        0.62
+4  Microondas/Radio        79        0.43
+C2b. Mismo recuento cruzado por elemento (para el gráfico apilado)
+
+   elemento  region_espectral  n_lineas
+0         B        Infrarrojo       268
+1         B  Microondas/Radio         6
+2         B           Rayos X        23
+3         B      Ultravioleta       519
+4         B           Visible       147
+..      ...               ...       ...
+35       Ne           Visible       920
+36        O        Infrarrojo       771
+37        O  Microondas/Radio         2
+38        O      Ultravioleta      1045
+39        O           Visible       722
+
+[40 rows x 3 columns]
+
+===== CELL 9 CODE SRC (first 500) =====
+df_cobertura = consultar('''
+SELECT
+    el.simbolo                                              AS elemento,
+    e.notacion                                              AS espectro,
+    COUNT(*)                                                AS n_lineas,
+    SUM(l.aki_s1 IS NOT NULL)                               AS n_con_aki,
+    ROUND(100.0 * SUM(l.aki_s1 IS NOT NULL) / COUNT(*), 1)  AS pct_con_aki
+FROM linea_espectral l
+JOIN espectro e  ON e.id_espectro  = l.id_espectro
+JOIN elemento el ON el
+----- OUTPUT -----
+C3. Porcentaje de líneas con Aki documentado, por espectro
+
+   elemento espectro  n_lineas  n_con_aki  pct_con_aki
+0        He     He I      2300     2289.0         99.5
+1         N      N I      1309     1287.0         98.3
+2         N     N II       809      786.0         97.2
+3         O      O I       910      854.0         93.8
+4         C     C II      1605     1433.0         89.3
+5        Li    Li II       663      564.0         85.1
+6         H      H I       568      441.0         77.6
+7         C      C I      2102     1616.0         76.9
+8        Li     Li I       344      257.0         74.7
+9         F      F I       162      120.0         74.1
+10        B     B II       592      435.0         73.5
+11        B      B I       371      269.0         72.5
+12       Be     Be I       581      394.0         67.8
+13        O     O II      1630      876.0         53.7
+14        F     F II       150       67.0         44.7
+15       Ne     Ne I      1597      533.0         33.4
+16       Be    Be II       681      149.0         21.9
+17       Ne    Ne II      1914      233.0         12.2
+
+===== CELL 11 CODE SRC (first 500) =====
+df_tipo = consultar('''
+SELECT
+    t.codigo,
+    t.nombre,
+    CASE WHEN t.es_permitida THEN 'permitida' ELSE 'prohibida' END AS clase,
+    COUNT(*)                                                AS n_lineas,
+    SUM(l.aki_s1 IS NOT NULL)                               AS n_con_aki,
+    ROUND(AVG(LOG10(NULLIF(l.aki_s1, 0))), 2)               AS log10_aki_promedio
+FROM linea_espectral l
+JOIN tipo_transicion t ON t.codigo = l.codigo_tipo_transicion
+GROUP BY t.codigo, t.nombre, t.es_permitida
+ORDER 
+----- OUTPUT -----
+C4. Aki típico según tipo de transición
+
+  codigo                nombre      clase  n_lineas  n_con_aki  log10_aki_promedio
+0     E1      Dipolo electrico  permitida     17955    12342.0                5.54
+1     E2  Cuadrupolo electrico  prohibida       167      152.0               -2.74
+2     M1      Dipolo magnetico  prohibida       111       92.0               -4.09
+3     UT        Sin clasificar  prohibida        38        0.0                 NaN
+4     M2  Cuadrupolo magnetico  prohibida        17       17.0               -1.08
+
+===== CELL 13 CODE SRC (first 500) =====
+df_calidad = consultar('''
+SELECT
+    ex.codigo                                               AS exactitud,
+    ex.orden,
+    COUNT(*)                                                AS n_lineas,
+    ROUND(AVG(LOG10(NULLIF(l.aki_s1, 0))), 2)               AS log10_aki_promedio
+FROM linea_espectral l
+JOIN exactitud ex ON ex.codigo = l.codigo_exactitud
+WHERE ex.orden <= 4
+  AND l.aki_s1 IS NOT NULL
+GROUP BY ex.codigo, ex.orden
+ORDER BY ex.orden;
+''', "C5. Líneas con Aki y exactitud AAA–A (orden ≤ 4
+----- OUTPUT -----
+C5. Líneas con Aki y exactitud AAA–A (orden ≤ 4)
+
+  exactitud  orden  n_lineas  log10_aki_promedio
+0       AAA      1      2651                4.55
+1        AA      2       743                3.25
+2        A+      3         1               -2.93
+3         A      4       510                6.03
+Total de líneas de alta calidad (suma): 3905
+
+
+===== CELL 15 CODE SRC (first 500) =====
+df_salto = consultar('''
+SELECT
+    el.simbolo                          AS elemento,
+    e.notacion                          AS espectro,
+    ROUND(l.longitud_onda_nm, 4)        AS lambda_nm,
+    l.aki_s1,
+    inf.configuracion                   AS conf_inferior,
+    ROUND(inf.energia_ev, 4)            AS E_inf_eV,
+    sup.configuracion                   AS conf_superior,
+    ROUND(sup.energia_ev, 4)            AS E_sup_eV,
+    ROUND(sup.energia_ev - inf.energia_ev, 4) AS salto_eV
+FROM linea_esp
+----- OUTPUT -----
+C6. Las 8 transiciones con Aki más alto, con sus dos niveles
+
+  elemento espectro  lambda_nm        aki_s1 conf_inferior  E_inf_eV          conf_superior  E_sup_eV  salto_eV
+0        C     C II     4.3169  7.000000e+11        2s.2p2    5.3379  1s.2s.(3S). 2p3.(4S*)    292.54  287.2021
+1        C     C II     4.2988  6.800000e+11        2s2.2p    0.0079             1s.2s2.2p2    288.42  288.4121
+2        C     C II     4.2988  5.500000e+11        2s2.2p    0.0000             1s.2s2.2p2    288.41  288.4100
+3        C     C II     4.3169  5.000000e+11        2s.2p2    5.3344  1s.2s.(3S). 2p3.(4S*)    292.54  287.2056
+4        C     C II     4.3060  3.000000e+11        2s2.2p    0.0079             1s.2s2.2p2    287.94  287.9321
+5        C     C II     4.2988  2.700000e+11        2s2.2p    0.0079             1s.2s2.2p2    288.41  288.4021
+6        C     C II     4.3060  2.500000e+11        2s2.2p    0.0000             1s.2s2.2p2    287.94  287.9400
+7        C     C II     4.3150  2.500000e+11        2s.2p2    5.3379  1s.2s.(3S). 2p3.(2D*)    292.67  287.3321
+C6b. ¿Hay algún salto al revés?
+
+   n_con_ambos_niveles  n_salto_positivo  n_incoherentes
+0                18073           18073.0             0.0
+
+===== CELL 17 CODE SRC (first 500) =====
+df_c7 = consultar('''
+WITH cobertura AS (
+    SELECT
+        e.notacion,
+        el.simbolo,
+        COUNT(*) AS n_lineas,
+        100.0 * SUM(l.aki_s1 IS NOT NULL) / COUNT(*) AS pct_con_aki
+    FROM linea_espectral l
+    JOIN espectro e  ON e.id_espectro  = l.id_espectro
+    JOIN elemento el ON el.id_elemento = e.id_elemento
+    GROUP BY e.id_espectro, e.notacion, el.simbolo
+),
+mediana AS (
+    SELECT AVG(pct_con_aki) AS pct_mediana
+    FROM (
+        SELECT pct_con_aki,
+               ROW_NUMB
+----- OUTPUT -----
+C7. Espectros con cobertura de Aki por debajo de la mediana del catálogo
+
+  espectro elemento  n_lineas  pct_con_aki  mediana_catalogo
+0    Ne II       Ne      1914         12.2              74.4
+1    Be II       Be       681         21.9              74.4
+2     Ne I       Ne      1597         33.4              74.4
+3     F II        F       150         44.7              74.4
+4     O II        O      1630         53.7              74.4
+5     Be I       Be       581         67.8              74.4
+6      B I        B       371         72.5              74.4
+7     B II        B       592         73.5              74.4
+8      F I        F       162         74.1              74.4
+
+===== CELL 19 CODE SRC (first 500) =====
+df = consultar('''
+SELECT
+    elemento,
+    espectro,
+    region_espectral,
+    longitud_onda_nm,
+    aki_s1,
+    log10_aki,
+    codigo_tipo_transicion,
+    es_permitida,
+    orden_exactitud,
+    energia_foton_ev
+FROM v_linea_analisis
+WHERE aki_s1 IS NOT NULL
+  AND longitud_onda_nm IS NOT NULL
+  AND log10_aki IS NOT NULL;
+''')
+
+df["log10_lambda"] = np.log10(df["longitud_onda_nm"])
+print(f"C8. Muestra de trabajo: {len(df):,} líneas con λ y Aki (esperadas ~12 603)")
+display(df.head())
+display(df[[
+----- OUTPUT -----
+      elemento espectro  region_espectral  longitud_onda_nm        aki_s1  log10_aki codigo_tipo_transicion  es_permitida  \
+0            B      B I      Ultravioleta      1.047647e+02  3.500000e+06   6.544068                     E1             1   
+1            B      B I      Ultravioleta      1.047695e+02  1.400000e+07   7.146128                     E1             1   
+2            B      B I      Ultravioleta      1.047825e+02  1.800000e+07   7.255273                     E1             1   
+3            B      B I      Ultravioleta      1.047867e+02  7.000000e+06   6.845098                     E1             1   
+4            B      B I      Ultravioleta      1.151207e+02  4.880000e+07   7.688420                     E1             1   
+...        ...      ...               ...               ...           ...        ...                    ...           ...   
+12598        O     O II        Infrarrojo      1.134960e+04  7.050000e+02   2.848189                     E1             1   
+12599        O     O II        Infrarrojo      4.995000e+05  1.300000e-07  -6.886057                     M1             0   
+12600        O     O II        Infrarrojo      4.995005e+05  1.490000e-20 -19.826814                     E2             0   
+12601        O     O II  Microondas/Radio      5.025000e+06  4.240000e-24 -23.372634                     E2             0   
+12602        O     O II  Microondas/Radio      5.030000e+06  1.410000e-10  -9.850781                     M1             0   
+
+       orden_exactitud  energia_foton_ev  
+0                   12         11.834478  
+1                   12         11.833969  
+2                   12         11.832582  
+3                   12         11.832074  
+4                    9         10.769875  
+...                ...               ...  
+12598                8          0.109241  
+12599                5          0.002482  
+12600               13          0.002482  
+12601               13          0.000247  
+12602                6          0.000247  
+
+[12603 rows x 10 columns]
+C8. Muestra de trabajo: 12,603 líneas con λ y Aki (esperadas ~12 603)
+
+  elemento espectro region_espectral  longitud_onda_nm      aki_s1  log10_aki codigo_tipo_transicion  es_permitida  orden_exactitud  \
+0        B      B I     Ultravioleta          104.7647   3500000.0   6.544068                     E1             1               12   
+1        B      B I     Ultravioleta          104.7695  14000000.0   7.146128                     E1             1               12   
+2        B      B I     Ultravioleta          104.7825  18000000.0   7.255273                     E1             1               12   
+3        B      B I     Ultravioleta          104.7867   7000000.0   6.845098                     E1             1               12   
+4        B      B I     Ultravioleta          115.1207  48800000.0   7.688420                     E1             1                9   
+
+   energia_foton_ev  log10_lambda  
+0         11.834478      2.020215  
+1         11.833969      2.020235  
+2         11.832582      2.020289  
+3         11.832074      2.020306  
+4         10.769875      2.061153  
+                    count          mean           std           min           25%            50%           75%           max
+longitud_onda_nm  12603.0  6.761716e+05  3.011378e+07  4.276700e+00    327.033525     922.785336  2.786804e+03  2.560000e+09
+aki_s1            12603.0  4.846888e+08  1.283931e+10  4.240000e-24  25200.000000  446000.000000  6.200000e+06  7.000000e+11
+log10_aki         12603.0  5.363740e+00  2.307735e+00 -2.337263e+01      4.401401       5.649335  6.792392e+00  1.184510e+01
+energia_foton_ev  12573.0  4.363600e+00  1.454669e+01  4.840000e-07      0.449090       1.344723  3.815992e+00  2.899110e+02
+
+===== CELL 22 CODE SRC (first 500) =====
+orden_regiones = ["Rayos X", "Ultravioleta", "Visible", "Infrarrojo", "Microondas/Radio"]
+df_region_plot = df_region.set_index("region_espectral").reindex(orden_regiones).dropna()
+
+fig, axes = plt.subplots(1, 2, figsize=(13, 4.6))
+
+axes[0].bar(df_region_plot.index, df_region_plot["n_lineas"], color="#3b6d9a")
+axes[0].set_title("Líneas por región (catálogo completo)")
+axes[0].set_ylabel("Número de líneas")
+axes[0].tick_params(axis="x", rotation=20)
+for i, (n, p) in enumerate(zip(df_region_plot["n
+----- OUTPUT -----
+<Figure size 1300x460 with 2 Axes>
+De 18,288 líneas, visibles = 3,822 (20.9%). IR + UV = 14,274 (78.1%).
+
+
+===== CELL 25 CODE SRC (first 500) =====
+pearson_crudo = df["longitud_onda_nm"].corr(df["aki_s1"], method="pearson")
+pearson_log = df["log10_lambda"].corr(df["log10_aki"], method="pearson")
+spearman_log = df["log10_lambda"].corr(df["log10_aki"], method="spearman")
+
+df_corr_global = pd.DataFrame({
+    "medida": [
+        "Pearson λ vs Aki (crudo)",
+        "Pearson log10(λ) vs log10(Aki)",
+        "Spearman log10(λ) vs log10(Aki)",
+    ],
+    "valor": [pearson_crudo, pearson_log, spearman_log],
+    "n": [len(df), len(df), len(df)],
+})
+p
+----- OUTPUT -----
+Relación global λ ↔ Aki, solo líneas con Aki (C8)
+
+                            medida     valor      n
+0         Pearson λ vs Aki (crudo) -0.000848  12603
+1   Pearson log10(λ) vs log10(Aki) -0.607996  12603
+2  Spearman log10(λ) vs log10(Aki) -0.644526  12603
+Misma Pearson log-log en el subconjunto de alta exactitud (C5, n=3,905): -0.6815
+
+
+===== CELL 27 CODE SRC (first 500) =====
+filas = []
+for elemento, g in df.groupby("elemento"):
+    filas.append({
+        "elemento": elemento,
+        "n_con_aki": len(g),
+        "pearson_log": g["log10_lambda"].corr(g["log10_aki"], method="pearson"),
+        "spearman_log": g["log10_lambda"].corr(g["log10_aki"], method="spearman"),
+        "mediana_log10_aki": g["log10_aki"].median(),
+        "mediana_lambda_nm": g["longitud_onda_nm"].median(),
+    })
+df_por_elem = pd.DataFrame(filas).sort_values("elemento")
+print("Correlación log-l
+----- OUTPUT -----
+Correlación log-log λ ↔ Aki por elemento
+
+  elemento  n_con_aki  pearson_log  spearman_log  mediana_log10_aki  mediana_lambda_nm
+0        B        704       -0.626        -0.585              6.224            478.421
+1       Be        543       -0.654        -0.673              5.886            854.737
+2        C       3049       -0.601        -0.604              6.086            588.977
+3        F        187       -0.567        -0.513              7.057            730.903
+4        H        441       -0.689        -0.268              4.596           1570.068
+5       He       2289       -0.474        -0.492              4.028           5673.812
+6       Li        821       -0.550        -0.559              5.764            968.620
+7        N       2073       -0.384        -0.491              5.815            746.831
+8       Ne        766       -0.579        -0.561              6.243            591.897
+9        O       1730       -0.607        -0.623              6.074            469.388
+<Figure size 850x520 with 1 Axes>
+
+===== CELL 29 CODE SRC (first 500) =====
+df["clase"] = np.where(df["es_permitida"].astype(bool), "Permitida (E1)", "Prohibida / UT")
+
+fig, ax = plt.subplots(figsize=(7.2, 4.4))
+sns.boxplot(data=df, x="clase", y="log10_aki", hue="clase", ax=ax, legend=False)
+ax.set_ylabel("log10(Aki / s⁻¹)")
+ax.set_xlabel("")
+ax.set_title("Aki según si la transición está permitida")
+plt.tight_layout()
+plt.show()
+
+resumen_clase = (
+    df.groupby("clase")
+    .agg(n=("aki_s1", "size"), mediana_log10_aki=("log10_aki", "median"))
+    .reset_index()
+)
+displ
+----- OUTPUT -----
+<Figure size 720x440 with 1 Axes>
+            clase      n  mediana_log10_aki
+0  Permitida (E1)  12342               5.69
+1  Prohibida / UT    261              -2.56
+  codigo                nombre      clase  n_lineas  n_con_aki  log10_aki_promedio
+0     E1      Dipolo electrico  permitida     17955    12342.0                5.54
+1     E2  Cuadrupolo electrico  prohibida       167      152.0               -2.74
+2     M1      Dipolo magnetico  prohibida       111       92.0               -4.09
+3     UT        Sin clasificar  prohibida        38        0.0                 NaN
+4     M2  Cuadrupolo magnetico  prohibida        17       17.0               -1.08
+
+===== CELL 31 CODE SRC (first 500) =====
+print("Cobertura de Aki por espectro (C3), de mejor a peor documentado:")
+display(df_cobertura)
+print("Por debajo de la mediana de cobertura (C7):")
+display(df_c7)
+----- OUTPUT -----
+Cobertura de Aki por espectro (C3), de mejor a peor documentado:
+
+   elemento espectro  n_lineas  n_con_aki  pct_con_aki
+0        He     He I      2300     2289.0         99.5
+1         N      N I      1309     1287.0         98.3
+2         N     N II       809      786.0         97.2
+3         O      O I       910      854.0         93.8
+4         C     C II      1605     1433.0         89.3
+5        Li    Li II       663      564.0         85.1
+6         H      H I       568      441.0         77.6
+7         C      C I      2102     1616.0         76.9
+8        Li     Li I       344      257.0         74.7
+9         F      F I       162      120.0         74.1
+10        B     B II       592      435.0         73.5
+11        B      B I       371      269.0         72.5
+12       Be     Be I       581      394.0         67.8
+13        O     O II      1630      876.0         53.7
+14        F     F II       150       67.0         44.7
+15       Ne     Ne I      1597      533.0         33.4
+16       Be    Be II       681      149.0         21.9
+17       Ne    Ne II      1914      233.0         12.2
+Por debajo de la mediana de cobertura (C7):
+
+  espectro elemento  n_lineas  pct_con_aki  mediana_catalogo
+0    Ne II       Ne      1914         12.2              74.4
+1    Be II       Be       681         21.9              74.4
+2     Ne I       Ne      1597         33.4              74.4
+3     F II        F       150         44.7              74.4
+4     O II        O      1630         53.7              74.4
+5     Be I       Be       581         67.8              74.4
+6      B I        B       371         72.5              74.4
+7     B II        B       592         73.5              74.4
+8      F I        F       162         74.1              74.4
+
+===== CELL 33 CODE SRC (first 500) =====
+pct_visible = 100 * n_visible / n_total
+pct_iruv = 100 * (n_ir + n_uv) / n_total
+n_aki = len(df)
+signos = df_por_elem["pearson_log"].dropna()
+n_neg = int((signos < 0).sum())
+r_min = signos.min()
+r_max = signos.max()
+el_min = df_por_elem.loc[signos.idxmin(), "elemento"]
+el_max = df_por_elem.loc[signos.idxmax(), "elemento"]
+fila_h = df_por_elem.loc[df_por_elem["elemento"] == "H"].iloc[0]
+he_i = df_cobertura.loc[df_cobertura["espectro"] == "He I", "pct_con_aki"].iloc[0]
+ne_ii = df_cobertura.loc[df_
+----- OUTPUT -----
+=== Respuesta a la pregunta (cifras de MySQL en este notebook) ===
+
+1) Distribución — catálogo NIST, no potencia emitida
+   18,288 transiciones documentadas de H–Ne.
+   Visible: 3,822 (20.9%). IR + UV: 14,274 (78.1%).
+   Conclusión: en este catálogo, ~4 de cada 5 líneas caen fuera de lo que ve el ojo.
+
+2) Relación Aki–λ — signo común, fuerza distinta
+   Muestra: 12,603 líneas con Aki medido (68.9 % del catálogo). No se imputó el resto.
+   Pearson crudo λ vs Aki = -0.0008 (parece que no hay relación).
+   Pearson log-log = -0.6080; Spearman log-log = -0.6445.
+   Alta exactitud AAA–A (n=3,905): Pearson log-log = -0.6815.
+   Por elemento: 10/10 Pearson log-log negativas.
+   Rango Pearson log-log: más fuerte H = -0.689; más débil N = -0.384 (mismo signo, distinta magnitud).
+   Hidrógeno: Pearson = -0.689, Spearman = -0.268. La media baja con λ, pero no es una nube monótona limpia.
+   Conclusión: a mayor λ, Aki tiende a ser menor (el átomo se desexcita más despacio).
+   Eso encaja con A ∝ ν³; no lo demuestra (el momento dipolar también cambia).
+
+3) Límite al comparar elementos
+   Se agrupó por elemento (C, Ne…), no por ion. He I tiene Aki en el 99.5 %; Ne II en el 12.2 %.
+   Un coeficiente en Ne no pesa igual que uno en He. Cobertura y física se mezclan.
+

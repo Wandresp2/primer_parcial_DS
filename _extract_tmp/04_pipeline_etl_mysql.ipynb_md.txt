@@ -1,0 +1,117 @@
+===== CELL 0 MARKDOWN =====
+# Notebook 4 — Pipeline ETL completo: NIST ASD → MySQL
+## Proyecto: Óptica y Fotónica — Primer Parcial
+
+**Estudiante:** Perez Criollo Andres David
+
+Este notebook ejecuta **de punta a punta y sin ningún paso manual** el ciclo completo de
+datos: descarga desde el NIST (con caché) → limpieza y transformación → construcción de la
+forma relacional → carga en MySQL. Es autocontenido: puede correrse de arriba a abajo sin
+depender de que otro notebook se haya ejecutado antes.
+
+**Requisito previo — orden obligatorio:**
+
+```
+1. docker compose up -d
+2. Ejecutar sql/schema.sql en DBeaver (o via mysql client)
+   — crea la base optica_y_fotonica (si no existe) y las 9 tablas VACIAS
+3. Ejecutar ESTE notebook — las puebla
+```
+
+Este notebook **no crea la base ni las tablas**. Si `optica_y_fotonica` o alguna tabla
+no existen todavía, se detiene con un mensaje claro (Sección 2) en vez de intentar
+crearlas: el DDL vive solo en `sql/schema.sql`.
+
+**Reejecución:** el notebook es idempotente. Cada vez que corre, **vacía y vuelve a cargar**
+las 9 tablas (Sección 7), así que puede ejecutarse tantas veces como se quiera sin errores de
+clave duplicada.
+
+**Sobre el nivel de detalle:** este es un notebook de *pipeline*, no de exploración didáctica.
+Cada decisión de limpieza (L1–L14) se aplica con un comentario breve; su justificación
+completa —computacional y física, con las cifras que la respaldan— ya está documentada en
+`notebooks/03_limpieza_datos.ipynb` y en `docs/RESULTADOS_exploracion_y_limpieza.md`. El
+diseño de las 9 tablas está justificado en `docs/PROPUESTA_modelo_relacional.md`.
+
+===== CELL 1 MARKDOWN =====
+---
+# Sección 1 — Librerías y conexión a MySQL
+
+Se usa **SQLAlchemy** (ya viene en la imagen `scipy-notebook`) con el driver **PyMySQL**
+(se instala si falta). La conexión usa el **nombre del servicio Docker** (`mysql`), no
+`localhost`, para demostrar que los contenedores se comunican por la red interna definida en
+`docker-compose.yml`.
+
+===== CELL 4 MARKDOWN =====
+---
+# Sección 2 — Verificación de que el esquema ya existe
+
+Este notebook **no ejecuta DDL**. Antes de tocar nada, comprueba que existe la base
+`optica_y_fotonica` y que las 9 tablas de `sql/schema.sql` ya están creadas (en DBeaver).
+Si falta la base o alguna tabla, se detiene con un mensaje explícito en vez de intentar
+crearlas — el orden schema→datos es un requisito del proyecto, no un detalle de
+implementación.
+
+===== CELL 7 MARKDOWN =====
+---
+# Sección 3 — Extracción (descarga con caché)
+
+Mismos parámetros y misma estrategia de caché validados en `02_exploracion_caracterizacion_datos.ipynb`:
+si el CSV crudo ya existe en `datos_originales/`, se lee de disco; si no, se descarga del
+NIST. El archivo crudo **nunca se modifica**.
+
+===== CELL 12 MARKDOWN =====
+---
+# Sección 4 — Transformación: limpieza (L1–L14)
+
+Se aplican, de forma condensada, las 14 decisiones ya justificadas y verificadas en
+`03_limpieza_datos.ipynb`. El principio que las gobierna: **en un dataset científico un valor
+ausente es información** — no se imputa en variables críticas, no se elimina ningún atípico.
+
+===== CELL 22 MARKDOWN =====
+---
+# Sección 5 — Transformación a forma relacional
+
+A partir del dataset limpio se construyen los **9 DataFrames** que corresponden 1:1 a las
+tablas de `sql/schema.sql`, siguiendo el diseño justificado en
+`docs/PROPUESTA_modelo_relacional.md`.
+
+===== CELL 31 MARKDOWN =====
+### Verificación de integridad antes de cargar
+
+Las mismas comprobaciones de la sección 18 de `03_limpieza_datos.ipynb`, aplicadas ahora
+sobre los DataFrames que van a insertarse. Si alguna falla, no se llega a tocar MySQL.
+
+===== CELL 33 MARKDOWN =====
+---
+# Sección 6 — Carga en MySQL (vaciar y recargar)
+
+Para que el notebook sea **repetible sin errores de clave duplicada**, cada ejecución vacía
+las 9 tablas (en orden inverso de dependencias, con las validaciones de clave foránea
+desactivadas temporalmente) y las vuelve a poblar desde cero, en **orden de dependencia**.
+Todo ocurre dentro de una única transacción: si algo falla a mitad de camino, no queda la
+base de datos a medias.
+
+**No hay ninguna inserción manual**: todo el proceso es código ejecutable de punta a punta.
+
+===== CELL 36 MARKDOWN =====
+---
+# Sección 7 — Verificación posterior a la carga
+
+Se comprueba, **consultando la base de datos** (no los DataFrames en memoria), que todo
+llegó completo y sin romper la integridad referencial.
+
+===== CELL 39 MARKDOWN =====
+### La consulta que demuestra que el modelo funciona: doble `JOIN` a `nivel_energia`
+
+Una línea espectral es un salto entre dos niveles. Esta consulta reconstruye la transición
+completa —elemento, longitud de onda, `Aki` y la configuración electrónica de los dos
+niveles— usando la clave foránea **dos veces sobre la misma tabla**, que es la particularidad
+central de este modelo relacional.
+
+===== CELL 42 MARKDOWN =====
+---
+# Sección 8 — Exportación de subproductos
+
+Se sobrescriben los CSV de `datos_procesados/` con el resultado de esta corrida (deben
+coincidir con los de `03_limpieza_datos.ipynb`, porque aplican la misma lógica de limpieza),
+como evidencia adicional de que el pipeline es reproducible de punta a punta.

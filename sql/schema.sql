@@ -6,23 +6,22 @@
 --
 -- Este script contiene UNICAMENTE DDL (definicion de estructura). No inserta
 -- ningun dato: la carga se hace despues, de forma automatizada, desde el
--- notebook notebooks/05_pipeline_etl_mysql.ipynb.
+-- notebook notebooks/04_pipeline_etl_mysql.ipynb.
 --
 -- Orden de ejecucion del proyecto:
 --   1. docker compose up -d          (levanta MySQL; no hace falta una base previa)
 --   2. Ejecutar este archivo en DBeaver contra el servidor MySQL  <-- este script
 --      Crea la base optica_y_fotonica (si no existe) y sus 9 tablas vacias.
 --      No es necesario estar conectado a una base ya creada.
---   3. Ejecutar notebooks/05_pipeline_etl_mysql.ipynb            (puebla las tablas)
+--   3. Ejecutar notebooks/04_pipeline_etl_mysql.ipynb            (puebla las tablas)
 --
 -- El script es RECONSTRUIBLE DESDE CERO: puede ejecutarse cuantas veces se
 -- quiera, porque empieza eliminando (si existen) la vista y las 9 tablas en
 -- el orden inverso de sus dependencias, y luego las vuelve a crear.
 --
--- Diseno relacional completo, justificado y verificado contra los datos
--- reales en: docs/PROPUESTA_modelo_relacional.md
--- Origen de los datos y proceso de limpieza en: docs/PLAN_limpieza_datos.md
---                                            y docs/RESULTADOS_exploracion_y_limpieza.md
+-- Diseno relacional y carga ETL documentados en: docs/04_pipeline_etl_mysql.md
+-- Origen de los datos y proceso de limpieza en: docs/03_limpieza_datos.md
+-- Exploracion / diagnostico previo en:         docs/02_exploracion_caracterizacion_datos.md
 -- ============================================================================
 
 -- Esta base NO depende de MYSQL_DATABASE ni de ninguna base preexistente.
@@ -150,7 +149,7 @@ CREATE TABLE nivel_energia (
     -- 130 niveles tienen g documentado pero J sin resolver: por eso g NO se
     -- deriva como columna generada (se perderian esos 130 registros), sino que
     -- se almacena junto con J y esta restriccion impide que se contradigan.
-    -- Ver docs/PROPUESTA_modelo_relacional.md, seccion 6.2.
+    -- Ver docs/04_pipeline_etl_mysql.md (forma relacional / integridad de nivel_energia).
     CONSTRAINT chk_nivel_degeneracion
         CHECK (j_valor IS NULL OR g IS NULL OR g = 2 * j_valor + 1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -276,7 +275,7 @@ CREATE TABLE nivel_referencia (
 -- region_espectral, longitud_onda_vacio_nm, log10_aki y energia_foton_ev son
 -- funciones de otras columnas no clave de linea_espectral. Almacenarlas violaria
 -- la 3FN y arriesgaria inconsistencias. Se calculan al vuelo en esta vista.
--- Ver docs/PROPUESTA_modelo_relacional.md, seccion 6.1.
+-- Ver docs/04_pipeline_etl_mysql.md (vista v_linea_analisis / 3FN).
 CREATE OR REPLACE VIEW v_linea_analisis AS
 SELECT
     l.id_linea,
@@ -310,5 +309,5 @@ LEFT JOIN exactitud   ex ON ex.codigo = l.codigo_exactitud;
 
 -- ============================================================================
 -- Fin del esquema. 9 tablas + 1 vista, todas vacias. Sin datos.
--- Siguiente paso: notebooks/05_pipeline_etl_mysql.ipynb
+-- Siguiente paso: notebooks/04_pipeline_etl_mysql.ipynb
 -- ============================================================================

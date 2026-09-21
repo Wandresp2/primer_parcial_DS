@@ -1,0 +1,145 @@
+===== CELL 0 MARKDOWN =====
+# Notebook 5 — Consultas SQL y análisis científico
+## Proyecto: Óptica y Fotónica — Primer Parcial
+
+**Estudiante:** Perez Criollo Andres David
+**Fuente de datos:** MySQL `optica_y_fotonica` (ya poblada por el notebook 04)
+**Desde:** contenedor Jupyter, red Docker `jupyter_mysql`, host `mysql`
+
+### Pregunta científica
+
+> ¿Cómo se distribuyen las líneas espectrales de H a Ne a lo largo del espectro electromagnético, y qué relación existe entre el coeficiente de Einstein Aki y la longitud de onda de emisión **en cada elemento**?
+
+Este notebook **no descarga ni limpia de nuevo**. Lee el modelo relacional por SQL, procesa los resultados con Pandas y responde las dos mitades de esa pregunta.
+
+**Por qué SQL y no el CSV:** el enunciado pide demostrar que Jupyter consulta MySQL por la red interna. Además, región espectral y `log10(Aki)` viven en la vista `v_linea_analisis` (no se almacenan, para no violar 3FN), así que hay que calcularlos en el servidor.
+
+===== CELL 1 MARKDOWN =====
+---
+# 0. Conexión Jupyter → MySQL
+
+El host es el **nombre del servicio Compose** (`mysql`), no `localhost`. `localhost` dentro de este contenedor sería Jupyter, no la base.
+
+===== CELL 3 MARKDOWN =====
+---
+# 1. Consultas SQL (dificultad creciente)
+
+Cada consulta responde un fragmento de la pregunta. El orden no es caprichoso: primero se confirma el inventario, luego se describe la distribución (primera mitad) y después se construye la evidencia para la relación λ–Aki (segunda mitad), sin tratar todos los elementos como si estuvieran igual de medidos.
+
+===== CELL 4 MARKDOWN =====
+## C1 — Inventario (consulta básica)
+
+**Qué se pregunta:** ¿estamos mirando el catálogo completo, y en qué rango de longitudes de onda vive?
+
+**Por qué esta consulta:** un `SELECT` con `COUNT` / `MIN` / `MAX` verifica la conexión y el volumen antes de interpretar nada. Si aquí no aparecen ~18 288 líneas, el resto del análisis no es reproducible.
+
+===== CELL 6 MARKDOWN =====
+## C2 — Distribución por región (`GROUP BY`)
+
+**Qué se pregunta:** primera mitad de la pregunta: ¿en qué parte del espectro electromagnético caen las líneas?
+
+**Por qué la vista:** `region_espectral` no está guardada en `linea_espectral` (sería un derivado y violaría 3FN). La calcula `v_linea_analisis` a partir de λ. Agrupar aquí es la forma correcta de clasificar colores sin reescribir la regla en Python.
+
+===== CELL 8 MARKDOWN =====
+## C3 — Cobertura de Aki por espectro (`GROUP BY` + `CASE`)
+
+**Qué se pregunta:** la pregunta dice *en cada elemento*. ¿Todos los espectros tienen Aki medido en la misma proporción?
+
+**Por qué no saltar esto:** si Ne II apenas tiene Aki y He I lo tiene casi completo, una correlación “por elemento” no es comparable sin decirlo. El faltante de Aki **no se imputó** (inventar Aki sería inventar la respuesta). Aquí se cuantifica ese hueco.
+
+===== CELL 10 MARKDOWN =====
+## C4 — Permitidas vs prohibidas (`JOIN` + agregados)
+
+**Qué se pregunta:** ¿Aki bajo es un error, o es otro fenómeno (transiciones prohibidas)?
+
+**Por qué el JOIN:** `es_permitida` no está en la tabla de líneas; vive en `tipo_transicion`. Sin el modelo relacional habría que re-interpretar el código `E1`/`M1` a mano. `AVG(LOG10(Aki))` resume una variable que abarca muchos órdenes de magnitud; la media aritmética de Aki crudo la dominarían unos pocos extremos.
+
+===== CELL 12 MARKDOWN =====
+## C5 — Solo líneas de alta exactitud (`JOIN` con escala ordinal)
+
+**Qué se pregunta:** si la relación λ–Aki aparece también cuando el NIST califica el dato como bueno (AAA … A, `orden <= 4`).
+
+**Por qué `orden` y no el texto:** `AAA` < `A` no se puede ordenar como cadena. La tabla `exactitud` existe precisamente para filtrar por calidad. Si la correlación se sostiene en este subconjunto, no es un artefacto de mediciones dudosas.
+
+===== CELL 14 MARKDOWN =====
+## C6 — Doble `JOIN` a `nivel_energia`
+
+**Qué se pregunta:** una línea espectral **es** el salto de un electrón entre dos niveles. ¿El nivel superior queda siempre por encima del inferior?
+
+**Por qué dos alias:** un solo `JOIN` describiría la mitad del fenómeno. Los alias `inf` y `sup` son la consulta avanzada que el modelo obliga (dos FK a la misma tabla). La comprobación `energia_sup > energia_inf` es una validación física, no cosmética.
+
+===== CELL 16 MARKDOWN =====
+## C7 — Subconsulta: espectros peor caracterizados
+
+**Qué se pregunta:** ¿qué espectros quedan por debajo de la **mediana** de cobertura de Aki?
+
+**Por qué una subconsulta y no un filtro fijo:** un umbral tipo “menos del 50 %” sería arbitrario. Comparar cada espectro con la mediana del propio catálogo deja que los datos marquen quién está “por debajo del típico”. Esos son los casos en los que hay que leer la correlación por elemento con más cautela.
+
+===== CELL 18 MARKDOWN =====
+## C8 — Extractor para el análisis (muestra de trabajo)
+
+**Qué se pregunta:** ya no se agrega: se traen las filas con λ y Aki para correlacionar y graficar en Pandas.
+
+**Por qué este filtro:** Aki ausente no se rellena. La segunda mitad de la pregunta solo se puede calcular donde el NIST sí midió la probabilidad. La vista entrega `log10_aki` y `region_espectral` ya calculados.
+
+===== CELL 20 MARKDOWN =====
+---
+# 2. Análisis científico
+
+A partir de aquí no hay más SQL de inventario: se interpretan C2–C8. La metodología es deliberada:
+
+1. Describir la **distribución** con *todas* las líneas (C2), no solo las que tienen Aki.
+2. Medir la relación λ–Aki solo donde Aki existe (C8), en escala logarítmica.
+3. Repetir esa relación **por elemento**, y contrastarla con la cobertura (C3, C7).
+4. Separar permitidas y prohibidas (C4), para no tratar las segundas como outliers erróneos.
+
+===== CELL 21 MARKDOWN =====
+## 2.1 Primera mitad: dónde emiten estos átomos
+
+**Justificación del gráfico de barras:** un porcentaje en una tabla se entiende; ver IR vs visible en la misma escala deja claro que el ojo humano solo ve una fracción del catálogo. El apilado por elemento comprueba que eso no es un artefacto de un solo átomo (p. ej. solo el carbono).
+
+===== CELL 23 MARKDOWN =====
+**Lectura:** en el **catálogo NIST** de H–Ne, la mayor parte de las transiciones documentadas **no cae en luz visible**. Infrarrojo y ultravioleta concentran ~78 % de las líneas; el visible ronda una de cada cinco. Eso no es la potencia de una lámpara: es cuántas transiciones distintas están tabuladas. Sigue siendo coherente con la física de estos átomos (muchos saltos de baja energía en IR, o UV de laboratorio) frente al intervalo estrecho 380–780 nm.
+
+El panel derecho muestra el mismo patrón en todos los elementos, con pesos distintos (C y N aportan más líneas). La primera mitad de la pregunta queda respondida con el catálogo completo, no con una muestra sesgada.
+
+===== CELL 24 MARKDOWN =====
+## 2.2 Por qué escala logarítmica (y no Aki crudo)
+
+**Justificación física:** el coeficiente de Einstein de emisión espontánea escala aproximadamente como $A \propto \nu^3 |\mu|^2$. Como $\nu = c/\lambda$, Aki tiende a ser **menor** cuando λ es mayor. En log-log esa dependencia se ve como una nube con pendiente negativa.
+
+**Justificación empírica:** Aki recorre decenas de órdenes de magnitud. En escala lineal casi todos los puntos se pegan al eje y Pearson se va a cero aunque la relación exista. Por eso se comparan Pearson/Spearman **crudos** frente a **log λ vs log Aki**.
+
+===== CELL 26 MARKDOWN =====
+## 2.3 Segunda mitad: la relación **en cada elemento**
+
+**Justificación de agrupar por elemento:** un único coeficiente global respondería “en promedio”, no “en cada elemento”. Cada elemento del catálogo tiene suficientes líneas con Aki para estimar Pearson; la incertidumbre real no es el n, sino la cobertura desigual (C7).
+
+**Justificación del scatter:** la tabla da un número; el gráfico muestra si la nube de cada elemento apunta en el mismo sentido o si algún átomo se sale.
+
+===== CELL 28 MARKDOWN =====
+## 2.4 Permitidas vs prohibidas: los “outliers” son física
+
+**Justificación del boxplot:** el IQR marcaría las transiciones M1/E2 como atípicas porque son minoría. Si su `log10(Aki)` está sistemáticamente más abajo, no se pueden borrar: son emisiones reales, mucho más lentas.
+
+===== CELL 30 MARKDOWN =====
+## 2.5 Lectura conjunta con la cobertura (C3 y C7)
+
+Los elementos no están igual de documentados. La correlación por elemento de la sección 2.3 debe leerse junto a esta tabla: un coeficiente sobre Ne II (poca cobertura) no pesa igual que uno sobre He I.
+
+===== CELL 32 MARKDOWN =====
+---
+# 3. Respuesta a la pregunta científica
+
+Pregunta: *¿cómo se distribuyen las líneas de H–Ne a lo largo del espectro, y qué relación hay entre Aki y la longitud de onda en cada elemento?*
+
+Los números salen de las consultas anteriores. Aquí se responde las dos mitades sin vender una ley idéntica en todos los átomos.
+
+===== CELL 34 MARKDOWN =====
+### Respuesta que se puede defender
+
+En el catálogo NIST de H–Ne, **~78 % de las líneas documentadas están en infrarrojo o ultravioleta y ~21 % en el visible.** Eso describe transiciones tabuladas, no cuánta luz visible produce una muestra.
+
+Donde el NIST midió Aki (12 603 líneas, sin imputar), **a mayor longitud de onda el coeficiente tiende a ser más bajo**: Pearson crudo ≈ 0; Pearson log-log ≈ −0,61 (y ≈ −0,68 en el recorte AAA–A). El **signo es negativo en los diez elementos**; la **fuerza no es la misma** (N más débil, H más fuerte en Pearson). En hidrógeno Spearman es claramente más débil que Pearson: hay tendencia, no una recta limpia. Eso **encaja** con $A \propto \nu^3$ (frecuencia más baja → desexcitación más lenta), pero no prueba esa fórmula sola, porque el momento dipolar también varía. Aki es una **tasa** (s⁻¹), no una probabilidad.
+
+Comparar elementos exige decir la cobertura: He I está casi completo; Ne II apenas tiene Aki. Las transiciones prohibidas no se borraron: su Aki vive órdenes de magnitud por debajo de las permitidas, como predice la regla de selección.
