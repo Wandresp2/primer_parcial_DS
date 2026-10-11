@@ -5,15 +5,16 @@
 -- ============================================================================
 --
 -- Este script contiene UNICAMENTE DDL (definicion de estructura). No inserta
--- ningun dato: la carga se hace despues, de forma automatizada, desde el
--- notebook notebooks/04_pipeline_etl_mysql.ipynb.
+-- ningun dato: la carga la hace scripts/04_etl_mysql.py (via ./instalar.sh).
 --
--- Orden de ejecucion del proyecto:
---   1. docker compose up -d          (levanta MySQL; no hace falta una base previa)
---   2. Ejecutar este archivo en DBeaver contra el servidor MySQL  <-- este script
---      Crea la base optica_y_fotonica (si no existe) y sus 9 tablas vacias.
---      No es necesario estar conectado a una base ya creada.
---   3. Ejecutar notebooks/04_pipeline_etl_mysql.ipynb            (puebla las tablas)
+-- Orden de ejecucion del proyecto (automatizado):
+--   1. docker compose up -d mysql
+--   2. Este DDL lo aplica scripts/04_etl_mysql.py via mysql client
+--   3. scripts/04_etl_mysql.py puebla las 9 tablas
+--   4. Streamlit (app/) consulta la base en la red optica_net
+--
+-- Tambien se puede aplicar a mano:
+--   docker exec -i <mysql_container> mysql -uroot -proot --skip-ssl < sql/schema.sql
 --
 -- El script es RECONSTRUIBLE DESDE CERO: puede ejecutarse cuantas veces se
 -- quiera, porque empieza eliminando (si existen) la vista y las 9 tablas en
@@ -309,5 +310,5 @@ LEFT JOIN exactitud   ex ON ex.codigo = l.codigo_exactitud;
 
 -- ============================================================================
 -- Fin del esquema. 9 tablas + 1 vista, todas vacias. Sin datos.
--- Siguiente paso: notebooks/04_pipeline_etl_mysql.ipynb
+-- Siguiente paso: scripts/04_etl_mysql.py (DML) y app/streamlit_app.py (UI).
 -- ============================================================================

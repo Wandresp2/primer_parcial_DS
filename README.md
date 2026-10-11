@@ -1,114 +1,90 @@
-# JupyterLab + MySQL 8.4 con Docker Compose
+# Óptica y Fotónica — NIST ASD → MySQL → Streamlit
 
-Stack de dos contenedores conectados por una red Docker que Compose crea automaticamente (`jupyter_mysql`, driver `bridge`). Desde un notebook se consulta MySQL usando el nombre del servicio (`mysql`), no `localhost`.
+Pipeline automatizado de datos atómicos (H–Ne) del [NIST Atomic Spectra Database](https://physics.nist.gov/PhysRefData/ASD/): descarga, limpieza, carga en MySQL 8.4 e interfaz analítica con Streamlit.
 
-Las credenciales estan fijas directamente en `docker-compose.yml` (sin archivo `.env`): no hay ningun paso de configuracion previo, solo levantar el stack.
+**Un solo comando** reproduce el sistema completo (sin Jupyter, sin DBeaver, sin notebooks).
 
 ## Requisitos
 
-- Docker Desktop encendido
-- Los puertos **3306** (MySQL) y **8888** (JupyterLab) deben estar **libres** en tu maquina. Si ya hay otro MySQL, XAMPP, MariaDB, otro Jupyter u otro contenedor usando esos puertos, `docker compose up` fallara. Libera esos puertos o cambia el mapeo en `docker-compose.yml` (por ejemplo `"3307:3306"` o `"8889:8888"`).
-
-No necesitas crear la red a mano: Compose la crea al levantar el stack.
+- Docker Engine + Compose (en Windows: Docker Desktop con integración **WSL2**)
+- Bash (Linux nativo o **WSL**)
+- Puertos libres **3306** (MySQL) y **8501** (Streamlit)
+- Internet (imagenes Docker, pip en el build, API NIST)
 
 ## Arranque
 
-1. Levanta los servicios (crea red, volumen y contenedores):
+En WSL o Linux, desde la raíz del repositorio:
 
 ```bash
-docker compose up -d
+chmod +x instalar.sh
+./instalar.sh
 ```
 
-2. Abre JupyterLab en [http://localhost:8888](http://localhost:8888) con el token `facil123` (definido en `docker-compose.yml`).
+El script:
 
-3. Crea la base de datos del proyecto y sus tablas ejecutando `sql/schema.sql` en DBeaver (conectado al servidor MySQL, sin necesidad de una base previa). El script hace `CREATE DATABASE optica_y_fotonica` y luego las 9 tablas vacias. Equivalente por terminal:
+1. Limpia solo los recursos Docker de este proyecto (`down -v`, volumen, red, imágenes del stack).
+2. Levanta MySQL 8.4 y espera el healthcheck.
+3. Ejecuta el pipeline en Docker: descarga NIST → limpieza L1–L14 → `sql/schema.sql` → ETL (9 tablas).
+4. Levanta Streamlit en background.
 
-```bash
-docker exec -i mysql_container mysql -uroot -proot < sql/schema.sql
-```
+### URLs y credenciales
 
-En PowerShell, si la redireccion `<` falla:
+| Servicio | Acceso |
+|----------|--------|
+| Streamlit | http://localhost:8501 |
+| MySQL (desde el host) | `localhost:3306` |
+| Base de datos | `optica_y_fotonica` |
+| Usuario / password | `root` / `root` |
+| Host MySQL (entre contenedores) | `mysql` |
+| Red Docker | `optica_net` |
 
-```powershell
-Get-Content sql/schema.sql -Raw | docker exec -i mysql_container mysql -uroot -proot
-```
+Credenciales fijas en `docker-compose.yml` (laboratorio). Streamlit y el pipeline usan las mismas variables de entorno.
 
-4. Ejecuta los notebooks en orden desde JupyterLab (carpeta `notebooks/`): `02_exploracion_caracterizacion_datos.ipynb` → `03_limpieza_datos.ipynb` → `04_pipeline_etl_mysql.ipynb` (puebla las 9 tablas) → `05_consultas_analisis_cientifico.ipynb`.
-
-5. Comprueba el estado de los contenedores:
+### Comandos útiles
 
 ```bash
 docker compose ps
+docker compose logs -f streamlit
+docker compose down          # apaga sin borrar datos MySQL
+docker compose down -v       # apaga y borra el volumen MySQL
 ```
 
-Compose reutiliza las imagenes locales `mysql:8.4` y `quay.io/jupyter/scipy-notebook:latest` si ya las tienes; si no, las descarga.
+Reinstalación completa desde cero: vuelve a ejecutar `./instalar.sh`.
 
-## Credenciales (fijas en `docker-compose.yml`)
+## Estructura
 
-| Variable | Valor |
-|---|---|
-| `MYSQL_ROOT_PASSWORD` | `root` |
-| `MYSQL_DATABASE` | `optica_y_fotonica` |
-| `JUPYTER_TOKEN` | `facil123` |
-
-Nota: en la imagen oficial de MySQL, `MYSQL_USER` no puede ser `root`. Para root usa solo `MYSQL_ROOT_PASSWORD`.
-
-La base de trabajo del proyecto es **`optica_y_fotonica`**. La crea `sql/schema.sql`; el pipeline ETL y los notebooks se conectan a esa base.
-
-## Conexion desde un notebook
-
-Host: `mysql` (nombre del servicio en `docker-compose.yml`). Puerto: `3306`.
-
-Las consultas SQL y la respuesta a la pregunta cientifica estan en `notebooks/05_consultas_analisis_cientifico.ipynb`. La conexion Jupyter → MySQL tambien se usa en `notebooks/04_pipeline_etl_mysql.ipynb`. Ejemplo:
-
-```python
-%pip install mysql-connector-python
-
-import mysql.connector
-
-conn = mysql.connector.connect(
-    host="mysql",
-    port=3306,
-    user="root",
-    password="root",
-    database="optica_y_fotonica",
-)
-
-cursor = conn.cursor()
-cursor.execute("SELECT VERSION();")
-print(cursor.fetchone())
-cursor.close()
-conn.close()
+```text
+instalar.sh                 Orquestador único
+docker-compose.yml          mysql + pipeline (profile) + streamlit
+Dockerfile.pipeline         Imagen del pipeline de datos
+Dockerfile.streamlit        Imagen de la UI
+requirements-*.txt          Dependencias Python por imagen
+sql/schema.sql              DDL: 9 tablas + vista v_linea_analisis
+scripts/
+  01_descarga_datos.py      Extract NIST → data/originales/
+  03_limpieza_datos.py      Transform → data/procesados/
+  04_etl_mysql.py           Load → MySQL
+  run_pipeline.sh           01 → 03 → 04
+app/
+  streamlit_app.py          UI (7 secciones + filtros)
+  db.py                     Conexión MySQL
+data/                       Generada en runtime (CSV no versionados)
+docs/                       Documentación técnica de cada etapa
+PLAN_AUTOMATIZACION.md      Plan e historial de la automatización
 ```
 
-Si cambias las credenciales en `docker-compose.yml`, actualiza tambien estos valores en los notebooks.
+## Documentación técnica
 
-## Persistencia
+| Doc | Contenido |
+|-----|-----------|
+| [docs/02_…](docs/02_exploracion_caracterizacion_datos.md) | Diagnóstico metodológico (historial; no corre en el `.sh`) |
+| [docs/03_…](docs/03_limpieza_datos.md) | Decisiones L1–L14 → `scripts/03_limpieza_datos.py` |
+| [docs/04_…](docs/04_pipeline_etl_mysql.md) | Modelo relacional y ETL → `scripts/04_etl_mysql.py` |
+| [docs/05_…](docs/05_consultas_analisis_cientifico.md) | Pregunta científica → UI Streamlit |
 
-- Los datos de MySQL viven en el volumen nombrado `mysql_data`. Sobreviven a `docker compose down` y a recrear contenedores.
-- Los notebooks se guardan en `./notebooks`.
+Detalle del diseño automatizado: [PLAN_AUTOMATIZACION.md](PLAN_AUTOMATIZACION.md).
 
-Detener sin borrar la base:
+## Autor
 
-```bash
-docker compose down
-```
-
-Borrar tambien el volumen de MySQL (se pierde la informacion):
-
-```bash
-docker compose down -v
-```
-
-No uses `-v` si quieres conservar los datos.
-
-## Estructura del proyecto
-
-```
-docker-compose.yml          Definicion de los dos contenedores (MySQL + JupyterLab)
-sql/schema.sql               DDL: crea la base y las 9 tablas + 1 vista, vacias
-notebooks/                   02 a 05: exploracion, limpieza, ETL y consultas SQL
-  datos_originales/          CSV crudos del NIST, sin modificar (evidencia de la fuente)
-  datos_procesados/          CSV limpios, generados por los notebooks
-docs/                        Documentacion tecnica de cada etapa (02 a 05)
-```
+Perez Criollo Andres David  
+Primer Parcial — Desarrollo de Software

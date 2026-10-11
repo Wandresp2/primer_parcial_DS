@@ -1,62 +1,58 @@
 # Documentación técnica — Pipeline ETL NIST ASD → MySQL
 
-**Notebook:** `notebooks/04_pipeline_etl_mysql.ipynb`  
+**Implementación:** `scripts/04_etl_mysql.py` (tras `01` y `03` en `run_pipeline.sh`)  
+**Orquestación:** `./instalar.sh`  
 **Proyecto:** Óptica y Fotónica — Primer Parcial  
 **Estudiante:** Perez Criollo Andres David  
 **Base de datos:** `optica_y_fotonica`  
-**DDL previo:** `sql/schema.sql`  
+**DDL:** `sql/schema.sql`  
 **Justificación de limpieza:** [docs/03_limpieza_datos.md](03_limpieza_datos.md)  
-**Rol en la cadena:** `01` → `02` → `03` → **04 (este)** → `05`
+**Rol en la cadena:** `01` → `02` (historial) → `03` → **04 (este)** → UI Streamlit
 
 ---
 
 ## 1. Contexto
 
-Este notebook ejecuta **de punta a punta y sin pasos manuales** el ciclo de datos:
+El script `04_etl_mysql.py` aplica el DDL y carga MySQL de forma **idempotente** (vacía y vuelve a cargar). La descarga y la limpieza L1–L14 ya ocurrieron en `scripts/01_descarga_datos.py` y `scripts/03_limpieza_datos.py`.
 
-**descarga (con caché) → limpieza L1–L14 → forma relacional → carga en MySQL**.
-
-Es autocontenido (puede correrse solo) e **idempotente** (vacía y vuelve a cargar). **No crea** la base ni las tablas: el DDL vive únicamente en `sql/schema.sql`.
-
-### Orden obligatorio del proyecto
+### Orden del flujo automatizado
 
 ```
-1. docker compose up -d
-2. Ejecutar sql/schema.sql   → crea optica_y_fotonica y 9 tablas vacías
-3. Ejecutar ESTE notebook    → las puebla
+1. docker compose up -d mysql          (healthcheck)
+2. pipeline: 01 → 03 → 04
+   - 04 aplica sql/schema.sql
+   - 04 puebla las 9 tablas desde data/procesados/
+3. docker compose up -d streamlit
 ```
 
-Si falta la base o alguna tabla, el notebook se detiene en la Sección 2 con un mensaje claro en lugar de inventar DDL.
+Si falta la base o alguna tabla tras el DDL, el ETL se detiene con un mensaje claro en lugar de inventar DDL ad hoc.
 
 ---
 
 ## 2. Qué se hizo (lectura simple)
 
-En lugar de cargar a mano miles de filas en DBeaver, el notebook:
+Sin pasos manuales en un cliente SQL:
 
 1. Se conecta al MySQL del Docker usando el nombre del servicio (`mysql`), no `localhost`.
-2. Comprueba que las 9 tablas del esquema existan.
-3. Lee (o descarga una vez) los CSV del NIST y aplica la misma limpieza ya justificada en el notebook 03.
-4. Parte la tabla ancha en **catálogos + hechos + puentes** (forma normal).
-5. Vacía las tablas en el orden seguro respecto a las claves foráneas y las vuelve a llenar en una sola corrida.
-6. Verifica conteos e integridad (cero referencias rotas) y reexporta CSV de apoyo.
+2. Aplica `sql/schema.sql` (base + 9 tablas + vista).
+3. Lee los CSV relacionales generados por la limpieza (`data/procesados/tabla_*.csv`).
+4. Vacía las tablas en el orden seguro respecto a las claves foráneas y las vuelve a llenar.
+5. Verifica conteos e integridad (cero referencias rotas).
 
-El resultado es una base lista para que el notebook 05 responda la pregunta científica con SQL.
+El resultado es una base lista para la UI Streamlit (`app/streamlit_app.py`).
 
 ---
 
-## 3. Recorrido por secciones
+## 3. Recorrido del script
 
-| Sección | Qué hace |
+| Paso | Qué hace |
 |---|---|
-| 1 | Librerías; SQLAlchemy/PyMySQL; credenciales; host `mysql` |
-| 2 | Verificar que existen las 9 tablas del esquema |
-| 3 | Extracción NIST con la misma estrategia de caché que exploración |
-| 4 | Transformación: decisiones L1–L14 (condensadas, misma lógica) |
-| 5 | Construcción de DataFrames relacionales + chequeo de integridad **antes** de insertar |
-| 6 | Vaciar (orden inverso de FK) y cargar (orden de dependencia) en transacción |
-| 7 | Verificación post-carga; demo de JOIN doble (línea ↔ niveles) |
-| 8 | Reexportar subproductos a `datos_procesados/` |
+| Conexión | SQLAlchemy/PyMySQL; host `mysql` en red `optica_net` |
+| DDL | Ejecutar `sql/schema.sql` vía cliente mysql |
+| Lectura | Cargar `tabla_*.csv` desde `data/procesados/` |
+| Integridad | Chequeo de claves **antes** de insertar |
+| Carga | Vaciar (orden inverso de FK) y cargar en transacción |
+| Verificación | Conteos post-carga; JOINs de humo |
 
 ---
 
@@ -64,27 +60,27 @@ El resultado es una base lista para que el notebook 05 responda la pregunta cien
 
 ### 4.1 Schema primero, datos después
 
-**Qué:** El notebook solo hace DML (DELETE/TRUNCATE + INSERT). El DDL está en `sql/schema.sql`.
+**Qué:** El script aplica DDL desde `sql/schema.sql` y luego DML (DELETE/TRUNCATE + INSERT). El modelo no se inventa en Python.
 
-**Por qué:** Es un requisito del proyecto separar definición de estructura y carga automatizada. Mezclar `CREATE TABLE` dentro del ETL ocultaría el modelo y dificultaría reconstruir la base desde cero en DBeaver.
+**Por qué:** Separar definición de estructura y carga automatizada. Mezclar `CREATE TABLE` ad hoc ocultaría el modelo y dificultaría reconstruir la base desde cero.
 
 ### 4.2 Host `mysql`, no `localhost`
 
 **Qué:** La URL de conexión usa el hostname del servicio Compose.
 
-**Por qué:** Jupyter y MySQL están en la red Docker `jupyter_mysql`. Desde el contenedor Jupyter, `localhost` sería el propio Jupyter, no el servidor MySQL.
+**Por qué:** Pipeline y Streamlit están en la red Docker `optica_net`. Desde esos contenedores, `localhost` sería el propio contenedor, no el servidor MySQL.
 
 ### 4.3 Idempotencia (vaciar y recargar)
 
 **Qué:** Cada ejecución limpia las 9 tablas y vuelve a insertar.
 
-**Por qué:** Evita errores de clave duplicada al re-correr el pipeline durante desarrollo o sustentación. El vaciado respeta dependencias (hijo antes que padre; o FK desactivadas temporalmente según la implementación del notebook).
+**Por qué:** Evita errores de clave duplicada al re-correr `./instalar.sh` o el profile `pipeline`. El vaciado respeta dependencias (hijo antes que padre; o FK desactivadas temporalmente según la implementación).
 
-### 4.4 Misma limpieza L1–L14, sin re-explicarla toda
+### 4.4 Limpieza L1–L14 fuera del ETL
 
-**Qué:** Se reaplica la transformación del notebook 03 (decodificar, Ritz, no imputar Aki, IDs texto, etc.).
+**Qué:** La transformación ya ocurrió en `scripts/03_limpieza_datos.py`; el ETL carga tablas ya normalizadas.
 
-**Por qué:** El ETL debe ser reproducible desde los originales. Las justificaciones físicas y estadísticas **viven** en [docs/03_limpieza_datos.md](03_limpieza_datos.md); aquí se documenta el *pipeline*, no se repite el tratado de limpieza.
+**Por qué:** El ETL debe ser reproducible desde los artefactos de `data/procesados/`. Las justificaciones físicas y estadísticas **viven** en [docs/03_limpieza_datos.md](03_limpieza_datos.md); aquí se documenta la carga, no se repite el tratado de limpieza.
 
 ### 4.5 Forma relacional (por qué 9 tablas)
 
@@ -105,7 +101,7 @@ La tabla ancha de exploración viola formas normales (listas de referencias en u
 
 **Por qué tablas puente:** las referencias vienen como listas separadas por comas (violación de 1FN). Separarlas permite integridad referencial y consultas por paper sin parsear texto.
 
-**Por qué no guardar `region_espectral` ni `log10_aki` en la tabla de líneas:** son derivadas; se exponen en la vista `v_linea_analisis` para no violar 3FN y aun así facilitar el análisis del notebook 05.
+**Por qué no guardar `region_espectral` ni `log10_aki` en la tabla de líneas:** son derivadas; se exponen en la vista `v_linea_analisis` para no violar 3FN y aun así facilitar el análisis en Streamlit.
 
 ### 4.6 Integridad antes y después de cargar
 
@@ -115,7 +111,7 @@ La tabla ancha de exploración viola formas normales (listas de referencias en u
 
 ### 4.7 Parámetros NIST alineados con exploración
 
-**Qué:** Misma estrategia de caché y parámetros validados en el notebook 02 (versión corregida para el pipeline).
+**Qué:** Misma estrategia de parámetros validados en el diagnóstico (docs/02); la descarga real vive en `scripts/01_descarga_datos.py`.
 
 **Por qué:** El ETL no debe reintroducir silenciosamente un conjunto distinto al diagnosticado. Si el archivo ya está en `datos_originales/`, no se vuelve a golpear al NIST.
 
@@ -123,11 +119,11 @@ La tabla ancha de exploración viola formas normales (listas de referencias en u
 
 ## 5. Resultados y artefactos
 
-### Integridad y volumen (salida típica del notebook)
+### Integridad y volumen (salida típica del pipeline)
 
-- 18 288 líneas, 5 752 niveles, 0 valores físicamente imposibles en la validación condensada.
-- Base de evidencia con Aki: 12 603 (coherente con limpieza).
-- Conteos MySQL = conteos Python en las 9 tablas.
+- ~18 288 líneas, ~5 752 niveles en CSV limpios; ~52 812 filas totales en MySQL tras el ETL.
+- Base de evidencia con Aki coherente con la limpieza (sin imputar Aki).
+- Conteos MySQL alineados con los CSV de `data/procesados/`.
 - 0 FK huérfanas post-carga.
 
 ### Artefactos
@@ -135,14 +131,14 @@ La tabla ancha de exploración viola formas normales (listas de referencias en u
 | Destino | Qué |
 |---|---|
 | MySQL `optica_y_fotonica` | 9 tablas pobladas + vista `v_linea_analisis` |
-| `sql/schema.sql` | Estructura vacía (prerrequisito) |
-| `notebooks/datos_procesados/` | Reexport de líneas/niveles limpios y/o `tabla_*.csv` según celdas del notebook |
+| `sql/schema.sql` | DDL aplicado por el script 04 |
+| `data/procesados/` | Entrada del ETL (`tabla_*.csv`, líneas/niveles limpios) |
 
 ---
 
 ## 6. Límites y qué sigue
 
-**Este notebook no:** responde la pregunta científica con gráficos ni correlación por elemento; no sustituye el DDL; no debe ejecutarse contra un MySQL sin `schema.sql`.
+**Este script no:** responde la pregunta científica con gráficos ni correlación por elemento; no sustituye el diseño del modelo (ese vive en el DDL).
 
-**Siguiente paso:** consultas y respuesta científica en  
-`notebooks/05_consultas_analisis_cientifico.ipynb` / [docs/05_consultas_analisis_cientifico.md](05_consultas_analisis_cientifico.md).
+**Siguiente paso:** consultas y respuesta científica en la UI Streamlit  
+(`app/streamlit_app.py`) / [docs/05_consultas_analisis_cientifico.md](05_consultas_analisis_cientifico.md).

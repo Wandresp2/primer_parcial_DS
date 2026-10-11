@@ -1,12 +1,12 @@
 # Documentación técnica — Limpieza y transformación de datos
 
-**Notebook:** `notebooks/03_limpieza_datos.ipynb`  
+**Implementación:** `scripts/03_limpieza_datos.py` (ejecutado por `scripts/run_pipeline.sh` / `./instalar.sh`)  
 **Proyecto:** Óptica y Fotónica — Primer Parcial  
 **Estudiante:** Perez Criollo Andres David  
-**Entrada:** `notebooks/datos_originales/` (solo lectura)  
-**Salida:** `notebooks/datos_procesados/`  
-**Diagnóstico de partida:** `notebooks/02_exploracion_caracterizacion_datos.ipynb` / [docs/02_exploracion_caracterizacion_datos.md](02_exploracion_caracterizacion_datos.md)  
-**Rol en la cadena:** `01` → `02` → **03 (este)** → `04` → `05`
+**Entrada:** `data/originales/` (solo lectura)  
+**Salida:** `data/procesados/`  
+**Diagnóstico de partida:** [docs/02_exploracion_caracterizacion_datos.md](02_exploracion_caracterizacion_datos.md)  
+**Rol en la cadena:** `01` → `02` (historial) → **03 (este)** → `04` → UI Streamlit
 
 ---
 
@@ -33,7 +33,7 @@ Que el NIST no haya medido el Aki de una línea no es un hueco que haya que tapa
 
 ## 2. Qué se hizo (lectura simple)
 
-Partiendo de los CSV crudos (sin modificarlos), el notebook:
+Partiendo de los CSV crudos (sin modificarlos), el script:
 
 1. Hace visibles los verdaderos vacíos (envoltorio `="..."`).
 2. Quita dos filas que no son datos sino títulos repetidos del archivo.
@@ -88,7 +88,7 @@ Orden de **ejecución** de decisiones: L3 → L1 → L2 → L4 → L5 → L6 →
 | **L11** | Drop 4 columnas | Lande, Prefix, Suffix, Leading percentages | Criterio: **% nulos + irrelevancia** para la pregunta; Prefix ya se capturó en banderas | Nulos ~99,5 / 78,8 / 74,0 / 69,4 % |
 | **L12** | Duplicados físicos | Bandera `medicion_repetida`; 0 eliminados | Son mediciones independientes del mismo salto: **valiosa, no basura** | 0 exactos; **70** por identidad física |
 | **L13** | Atípicos | IQR detecta; **0 eliminados** | Los extremos suelen ser **transiciones prohibidas** (Aki órdenes de magnitud menor); IQR obliga a mirar, no a borrar | 2 181 (17,3 %) marcados por IQR en Aki |
-| **L14** | Unión por Level ID | Doble merge inferior/superior + nombres snake_case | Una línea **es** un salto entre dos niveles; la clave empírica ganadora del notebook 02 | 18 073 (98,82 %) con ambos niveles; +0 filas artificiales |
+| **L14** | Unión por Level ID | Doble merge inferior/superior + nombres snake_case | Una línea **es** un salto entre dos niveles; la clave empírica ganadora del diagnóstico (docs/02) | 18 073 (98,82 %) con ambos niveles; +0 filas artificiales |
 
 ### Por qué este orden
 
@@ -123,18 +123,19 @@ Antes del ETL se verifica que las claves que usará MySQL son viables: IDs únic
 
 | Archivo | Contenido |
 |---|---|
-| `notebooks/datos_procesados/lineas_limpias.csv` | 18 288 líneas |
-| `notebooks/datos_procesados/niveles_limpios.csv` | 5 752 niveles |
-| `notebooks/datos_procesados/dataset_limpio.csv` | Unión ancha de análisis |
-| `notebooks/datos_procesados/diccionario_columnas.csv` | Diccionario de variables |
+| `data/procesados/lineas_limpias.csv` | 18 288 líneas |
+| `data/procesados/niveles_limpios.csv` | 5 752 niveles |
+| `data/procesados/dataset_limpio.csv` | Unión ancha de análisis |
+| `data/procesados/diccionario_columnas.csv` | Diccionario de variables |
+| `data/procesados/tabla_*.csv` | Tablas relacionales listas para el ETL |
 
-Los MD5 de `datos_originales/` se verifican para demostrar que la evidencia cruda no se alteró.
+Los MD5 / integridad de `data/originales/` se verifican para demostrar que la evidencia cruda no se alteró.
 
 ---
 
 ## 6. Límites y qué sigue
 
-**Este notebook no:** crea la base MySQL, no inserta filas, no responde la pregunta con SQL.
+**Este script no:** crea la base MySQL, no inserta filas, no responde la pregunta con SQL.
 
 **Siguiente paso:** el pipeline ETL en  
-`notebooks/04_pipeline_etl_mysql.ipynb` / [docs/04_pipeline_etl_mysql.md](04_pipeline_etl_mysql.md), que reaplica L1–L14 de forma automatizada y carga las 9 tablas definidas en `sql/schema.sql`.
+`scripts/04_etl_mysql.py` / [docs/04_pipeline_etl_mysql.md](04_pipeline_etl_mysql.md), que carga las 9 tablas definidas en `sql/schema.sql`.

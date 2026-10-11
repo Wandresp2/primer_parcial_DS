@@ -1,0 +1,8 @@
+# 1.40.x: estable en Docker. Evitar 1.65+ (uvicorn) que puede dejar pantalla en blanco.
+streamlit==1.40.2
+plotly
+pandas
+numpy
+mysql-connector-python
+sqlalchemy
+pymysql

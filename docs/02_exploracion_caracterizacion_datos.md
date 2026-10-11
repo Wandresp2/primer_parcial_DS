@@ -1,10 +1,10 @@
 # Documentación técnica — Exploración y caracterización de datos
 
-**Notebook:** `notebooks/02_exploracion_caracterizacion_datos.ipynb`  
+**Estado:** historial metodológico (la etapa 02 **no** forma parte de `./instalar.sh`)  
 **Proyecto:** Óptica y Fotónica — Primer Parcial  
 **Estudiante:** Perez Criollo Andres David  
 **Fuente:** NIST Atomic Spectra Database (ASD)  
-**Rol en la cadena:** `01` (descarga) → **02 (este)** → `03` (limpieza) → `04` (ETL) → `05` (consultas)
+**Rol en la cadena:** `01` (descarga) → **02 (diagnóstico, este doc)** → `03` (limpieza) → `04` (ETL) → UI Streamlit
 
 ---
 
@@ -21,9 +21,9 @@ De esa pregunta se deriva la prioridad de variables:
 | Críticas | Longitud de onda, Aki, elemento/espectro, energías de los niveles | Sin ellas no se puede responder ninguna mitad de la pregunta |
 | Secundarias | Incertidumbres, referencias, leading percentages, factor de Landé | Útiles para calidad y trazabilidad, no para la respuesta central |
 
-### Qué es este notebook
+### Qué documenta este archivo
 
-Es el **diagnóstico**. Obtiene (o reutiliza en caché) las dos fuentes del NIST, las caracteriza, mide faltantes, valida física básica y construye un `df_analysis` de exploración. **No limpia:** no imputa, no unifica λ, no elimina outliers ni columnas.
+Es el **diagnóstico** que originó las decisiones L1–L14. Caracteriza las dos fuentes del NIST, mide faltantes, valida física básica y define el marco de exploración. **No limpia:** no imputa, no unifica λ, no elimina outliers ni columnas. En el flujo automatizado, la descarga vive en `scripts/01_descarga_datos.py` y la limpieza en `scripts/03_limpieza_datos.py`.
 
 ---
 
@@ -155,20 +155,20 @@ Después se midió qué tan completo está cada espectro (sobre todo Aki), se co
 | Pearson log-log | −0,6805 |
 | Merge por Level ID (ambos niveles) | 98,81 % |
 
-### Artefactos
+### Artefactos (rutas actuales del pipeline)
 
-- `notebooks/datos_originales/nist_lines_H_Ne_original.csv`
-- `notebooks/datos_originales/nist_levels_todos_original.csv`
-- `notebooks/datos_originales/niveles/nist_levels_*_original.csv` (18 archivos)
-- `df_analysis` en memoria (no se escribe como “modelo final”)
+- `data/originales/nist_lines_H_Ne_original.csv`
+- `data/originales/nist_levels_todos_original.csv`
+- `data/originales/niveles/nist_levels_*_original.csv` (18 archivos)
+- `df_analysis` era exploratorio en memoria (no es el modelo final)
 
-Los CSV originales **no se modifican**.
+Los CSV originales **no se modifican** en la limpieza.
 
 ---
 
 ## 6. Límites y qué sigue
 
-**Este notebook no:** imputa Aki ni λ, no unifica aire/vacío, no elimina outliers, no carga MySQL, no responde la pregunta científica con la base poblada.
+**Esta etapa no:** imputa Aki ni λ, no unifica aire/vacío, no elimina outliers, no carga MySQL, no responde la pregunta científica con la base poblada.
 
-**Siguiente paso:** ejecutar y documentar la limpieza conservadora en  
-`notebooks/03_limpieza_datos.ipynb` / [docs/03_limpieza_datos.md](03_limpieza_datos.md), donde cada hallazgo de este diagnóstico se convierte en una decisión L1–L14.
+**Siguiente paso:** limpieza conservadora documentada en  
+[docs/03_limpieza_datos.md](03_limpieza_datos.md) e implementada en `scripts/03_limpieza_datos.py`, donde cada hallazgo de este diagnóstico se convierte en una decisión L1–L14.
