@@ -2,14 +2,14 @@
 
 Pipeline automatizado de datos atómicos (H–Ne) del [NIST Atomic Spectra Database](https://physics.nist.gov/PhysRefData/ASD/): descarga, limpieza, carga en MySQL 8.4 e interfaz analítica con Streamlit.
 
-**Un solo comando** reproduce el sistema completo (sin Jupyter, sin DBeaver, sin notebooks).
+**Un solo comando** reproduce el sistema completo.
 
 ## Requisitos
 
 - Docker Engine + Compose (en Windows: Docker Desktop con integración **WSL2**)
 - Bash (Linux nativo o **WSL**)
 - Puertos libres **3306** (MySQL) y **8501** (Streamlit)
-- Internet (imagenes Docker, pip en el build, API NIST)
+- Internet (imágenes Docker, pip en el build, API NIST)
 
 ## Arranque
 
@@ -69,22 +69,10 @@ app/
   streamlit_app.py          UI (7 secciones + filtros)
   db.py                     Conexión MySQL
 data/                       Generada en runtime (CSV no versionados)
-docs/                       Documentación técnica de cada etapa
-PLAN_AUTOMATIZACION.md      Plan e historial de la automatización
 ```
-
-## Documentación técnica
-
-| Doc | Contenido |
-|-----|-----------|
-| [docs/02_…](docs/02_exploracion_caracterizacion_datos.md) | Diagnóstico metodológico (historial; no corre en el `.sh`) |
-| [docs/03_…](docs/03_limpieza_datos.md) | Decisiones L1–L14 → `scripts/03_limpieza_datos.py` |
-| [docs/04_…](docs/04_pipeline_etl_mysql.md) | Modelo relacional y ETL → `scripts/04_etl_mysql.py` |
-| [docs/05_…](docs/05_consultas_analisis_cientifico.md) | Pregunta científica → UI Streamlit |
-
-Detalle del diseño automatizado: [PLAN_AUTOMATIZACION.md](PLAN_AUTOMATIZACION.md).
 
 ## Autor
 
-Perez Criollo Andres David  
-Primer Parcial — Desarrollo de Software
+Perez Criollo Andres David
+
+Pipeline del proyecto del primer parcial usando Streamlit 
