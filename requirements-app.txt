@@ -1,5 +1,6 @@
-# 1.40.x: estable en Docker. Evitar 1.65+ (uvicorn) que puede dejar pantalla en blanco.
-streamlit==1.40.2
+# 1.51.x: estable en Docker + API width="stretch" (dataframe/plotly).
+# Evitar 1.65+ (uvicorn) que puede dejar pantalla en blanco.
+streamlit==1.51.0
 plotly
 pandas
 numpy

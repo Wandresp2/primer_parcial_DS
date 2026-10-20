@@ -38,7 +38,17 @@ El script:
 | Host MySQL (entre contenedores) | `mysql` |
 | Red Docker | `optica_net` |
 
-Credenciales fijas en `docker-compose.yml` (laboratorio). Streamlit y el pipeline usan las mismas variables de entorno.
+Credenciales fijas en `docker-compose.yml` (laboratorio). Streamlit y el pipeline usan las mismas variables de entorno. No hace falta un archivo `.env` para usar el proyecto.
+
+**Nice to have (futuro):** un `.env` + `.env.example` para externalizar `MYSQL_*` sin editar el compose (buenas prácticas; no aporta seguridad real con `root`/`root` de laboratorio). El `.env` real no debería versionarse.
+
+### Streamlit (versión de la UI)
+
+- Pin: **`streamlit==1.51.0`** en `requirements-app.txt` (estable en Docker; soporta `width="stretch"` en dataframes/plotly).
+- Evitar **1.65+** (puede dejar pantalla en blanco por cambios de servidor/uvicorn).
+- Tras actualizar dependencias o clonar: rebuild de la imagen UI  
+  `docker compose build streamlit && docker compose up -d streamlit`  
+  (o vuelve a correr `./instalar.sh`).
 
 ### Comandos útiles
 

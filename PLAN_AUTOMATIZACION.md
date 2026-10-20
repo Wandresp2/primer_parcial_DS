@@ -185,6 +185,8 @@ El usuario entra al navegador (en Windows, con Docker Desktop + WSL, normalmente
 | Volumen | `mysql_data` |
 | Streamlit | puerto host `8501:8501` |
 
+**Nice to have (futuro, no bloqueante):** `.env` + `.env.example` para `MYSQL_*` (compose con `env_file`), sin versionar el `.env` real. Hoy las variables viven en `docker-compose.yml`; es suficiente para laboratorio.
+
 ---
 
 ## 5. Estructura de repositorio objetivo
@@ -460,7 +462,7 @@ No se requiere: Python en el host, Jupyter, DBeaver, venv local, edición de `.e
 
 - [x] Reescribir `docker-compose.yml`: quitar Jupyter; red `optica_net`; servicios `mysql`, `pipeline` (profile), `streamlit`
 - [x] Crear `Dockerfile.pipeline` y `Dockerfile.streamlit` (dos imágenes)
-- [x] `requirements-pipeline.txt` y `requirements-app.txt` (mínimos; app pinned `streamlit==1.40.2`)
+- [x] `requirements-pipeline.txt` y `requirements-app.txt` (mínimos; app pinned `streamlit==1.51.0`)
 - [x] `.gitattributes` → `*.sh text eol=lf`
 - [x] `.gitignore` → CSV en `data/`, `__pycache__/`, etc.
 - [x] Stub `app/streamlit_app.py` que muestre “Óptica y Fotónica — OK” y pruebe ping a MySQL si está up
@@ -478,7 +480,7 @@ No se requiere: Python en el host, Jupyter, DBeaver, venv local, edición de `.e
 | `Dockerfile.pipeline` | Python 3.11 + deps pipeline + `mysql-client` (para schema en fases siguientes) |
 | `Dockerfile.streamlit` | Python 3.11 + Streamlit; escucha `0.0.0.0:8501`; flags headless/CORS/XSRF para Docker |
 | `requirements-pipeline.txt` | pandas, requests, numpy, conectores MySQL |
-| `requirements-app.txt` | streamlit==1.40.2, plotly, pandas, numpy, conectores MySQL |
+| `requirements-app.txt` | streamlit==1.51.0, plotly, pandas, numpy, conectores MySQL |
 | `app/streamlit_app.py` | Stub UI + ping MySQL por env (`MYSQL_HOST=mysql`, …) |
 | `scripts/.gitkeep` | Placeholder hasta Fase 2 |
 | `data/originales/.gitkeep`, `data/procesados/.gitkeep` | Destino de CSV regenerados (ignorados por git) |
@@ -495,7 +497,7 @@ docker compose down          # apaga sin borrar datos
 docker compose down -v       # apaga y borra volumen MySQL
 ```
 
-**Nota UI:** si la página queda en negro/blanco vacío, hard-refresh (Ctrl+F5) o rebuild con la imagen pinned a Streamlit 1.40.2.  
+**Nota UI:** si la página queda en negro/blanco vacío, hard-refresh (Ctrl+F5) o rebuild con la imagen pinned a Streamlit **1.51.0** (evitar 1.65+). Dataframes/plotly usan `width="stretch"` (reemplazo de `use_container_width`).  
 **README / docs/02–05:** actualizados en **Fase 7** (flujo `./instalar.sh` + scripts + Streamlit).
 
 
@@ -766,3 +768,4 @@ Fase 0 (plan)
 | 2026-10-10 | **Fase 6 hecha:** UI Streamlit 7 secciones + filtros + Plotly; `COMPOSE_PROJECT_NAME` fijo en `instalar.sh`. |
 | 2026-10-10 | **Fase 7 hecha:** eliminados `notebooks/`, `automatizacion/`, `_gen_03_from_nb.py`; README + docs/02–05 + `schema.sql` alineados a `./instalar.sh`. |
 | 2026-10-11 | **Fase 8 hecha:** doble `./instalar.sh` OK; MySQL 52 812 filas; Streamlit 7 secciones + filtros; plan marcado **implementado**. |
+| 2026-10-20 | Streamlit pin **1.40.2 → 1.51.0** (estable; `width="stretch"` en UI; evitar 1.65+). `.env` documentado como nice-to-have (no implementado). |

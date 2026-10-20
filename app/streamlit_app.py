@@ -154,7 +154,7 @@ def seccion_inventario(df: pd.DataFrame) -> None:
 
     st.subheader("Filas según filtros actuales")
     st.write(f"**{len(df):,}** líneas en la vista filtrada.")
-    st.dataframe(counts, hide_index=True, use_container_width=True)
+    st.dataframe(counts, hide_index=True, width="stretch")
 
 
 def seccion_distribucion(df: pd.DataFrame) -> None:
@@ -187,8 +187,8 @@ def seccion_distribucion(df: pd.DataFrame) -> None:
         title="Líneas por región espectral (filtro activo)",
     )
     fig.update_traces(textposition="outside")
-    st.plotly_chart(fig, use_container_width=True)
-    st.dataframe(dist, hide_index=True, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
+    st.dataframe(dist, hide_index=True, width="stretch")
 
     visible = dist.loc[dist["region_espectral"] == "Visible", "pct"]
     if len(visible):
@@ -226,8 +226,8 @@ def seccion_cobertura(df: pd.DataFrame) -> None:
         labels={"pct_aki": "% líneas con Aki", "espectro": "Espectro"},
         title="Cobertura de Aki (menor → peor documentado)",
     )
-    st.plotly_chart(fig, use_container_width=True)
-    st.dataframe(cov, hide_index=True, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
+    st.dataframe(cov, hide_index=True, width="stretch")
     peores = cov.nsmallest(3, "pct_aki")
     st.warning(
         "Espectros con menor cobertura: "
@@ -275,7 +275,7 @@ def seccion_lambda_aki(df: pd.DataFrame) -> None:
         title="Scatter log-log λ vs Aki (muestra ≤ 4000 puntos)",
         hover_data=["espectro", "region_espectral", "codigo_exactitud"],
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     filas = []
     for el, g in sub.groupby("elemento"):
@@ -294,7 +294,7 @@ def seccion_lambda_aki(df: pd.DataFrame) -> None:
         )
     por_el = pd.DataFrame(filas).sort_values("pearson_loglog")
     st.subheader("Correlación log-log por elemento")
-    st.dataframe(por_el, hide_index=True, use_container_width=True)
+    st.dataframe(por_el, hide_index=True, width="stretch")
     if not por_el.empty:
         neg = (por_el["pearson_loglog"] < 0).sum()
         st.success(
@@ -336,8 +336,8 @@ def seccion_tipos(df: pd.DataFrame) -> None:
         },
         title="Distribución de log₁₀(Aki) por tipo de transición",
     )
-    st.plotly_chart(fig, use_container_width=True)
-    st.dataframe(resumen, hide_index=True, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
+    st.dataframe(resumen, hide_index=True, width="stretch")
 
 
 def seccion_explorador(df: pd.DataFrame) -> None:
@@ -371,7 +371,7 @@ def seccion_explorador(df: pd.DataFrame) -> None:
         """,
         {"ids": ids},
     )
-    st.dataframe(detalle, hide_index=True, use_container_width=True)
+    st.dataframe(detalle, hide_index=True, width="stretch")
     st.download_button(
         "Descargar CSV (filas mostradas)",
         detalle.to_csv(index=False).encode("utf-8"),
@@ -440,7 +440,7 @@ def seccion_respuesta(df: pd.DataFrame) -> None:
     st.dataframe(
         dist.sort_values("lineas", ascending=False),
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
     )
     vis = dist.loc[dist["region_espectral"] == "Visible", "pct"]
     st.markdown(
