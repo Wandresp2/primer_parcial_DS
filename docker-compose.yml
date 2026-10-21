@@ -1,3 +1,8 @@
+# Óptica y Fotónica — MySQL + Streamlit
+# Estilo Lab 8 del taller: image (Hub) + build (local).
+# Tras publicar en Hub, otra persona puede: docker compose pull && docker compose up -d --no-build
+# (equivalente a comentar "build:" como en Lab 10 del PDF).
+
 services:
   mysql:
     image: mysql:8.4
@@ -10,7 +15,6 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      # Primer arranque (volumen vacío): carga schema + datos automáticamente
       - ./init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
     networks:
       - optica_net
@@ -22,6 +26,7 @@ services:
       start_period: 60s
 
   streamlit:
+    image: andresperez3/optica-fotonica:latest
     build:
       context: .
       dockerfile: Dockerfile

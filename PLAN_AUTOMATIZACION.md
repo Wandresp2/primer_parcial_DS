@@ -791,3 +791,5 @@ Fase 0 (plan)
 | 2026-10-20 | Dump **`init.sql`** (~4.5 MB) desde `mysql_container` (`optica_y_fotonica`, ~52 812 filas). Camino Hub: init en primer arranque, sin pipeline obligatorio. Reducir datos = nice to have. `instalar.sh` no va dentro de la imagen Hub. |
 | 2026-10-20 | **Refactor entrega:** un `Dockerfile` + `requirements.txt` pinneado; `.dockerignore`; compose monta `init.sql` (opción A); sin servicio `pipeline`; arranque `docker compose up -d --build`; `instalar.sh` solo atajo local. |
 | 2026-10-20 | **Limpieza repo:** eliminados `scripts/`, `data/`, `sql/`, `instalar.sh`. Runtime = compose + `init.sql` + `app/`. Conservados `docs/` y este plan. |
+| 2026-10-20 | Compose Streamlit: `image: andresperez3/optica-fotonica:latest` + `build` local. Arranque `docker compose up -d`; push documentado en README. |
+| 2026-10-20 | Entrega Hub (PDF Labs 8–10): `lab-arranque.sh` / `.ps1` liberan 3306/8501, `down -v`, `pull`, `up --no-build`. Tag `latest`. Push lo hace el autor (pasos en README). |
