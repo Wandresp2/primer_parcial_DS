@@ -1,12 +1,14 @@
 # Documentación técnica — Consultas SQL y análisis científico
 
+> **Nota runtime (2026-10):** MySQL se puebla con **`init.sql`** al primer arranque. La UI sigue en `app/`.
+
 **Implementación:** `app/streamlit_app.py` (+ `app/db.py`)  
 **Proyecto:** Óptica y Fotónica — Primer Parcial  
 **Estudiante:** Perez Criollo Andres David  
-**Fuente de datos:** MySQL `optica_y_fotonica` (poblada por `scripts/04_etl_mysql.py`)  
+**Fuente de datos:** MySQL `optica_y_fotonica` (via `init.sql`)  
 **Conexión:** contenedor Streamlit → host Docker `mysql`, red `optica_net`  
 **Documentación previa:** [docs/04_pipeline_etl_mysql.md](04_pipeline_etl_mysql.md)  
-**Rol en la cadena:** `01` → `02` (historial) → `03` → `04` → **UI Streamlit (este)**
+**Rol en la cadena:** datos (`init.sql`) → **UI Streamlit (este)**
 
 ---
 

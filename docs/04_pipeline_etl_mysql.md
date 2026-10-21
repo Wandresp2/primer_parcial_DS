@@ -1,13 +1,15 @@
 # Documentación técnica — Pipeline ETL NIST ASD → MySQL
 
-**Implementación:** `scripts/04_etl_mysql.py` (tras `01` y `03` en `run_pipeline.sh`)  
-**Orquestación:** `./instalar.sh`  
+> **Nota runtime (2026-10):** el arranque del producto carga schema + datos con **`init.sql`** (mount en MySQL). Este documento describe el ETL histórico que generó ese dump (`scripts/` / `sql/schema.sql` ya no están en el repo).
+
+**Implementación (histórica):** `scripts/04_etl_mysql.py`  
+**Orquestación actual:** `docker compose up -d --build`  
 **Proyecto:** Óptica y Fotónica — Primer Parcial  
 **Estudiante:** Perez Criollo Andres David  
 **Base de datos:** `optica_y_fotonica`  
-**DDL:** `sql/schema.sql`  
+**Entrega de datos actual:** `init.sql` (raíz del repo)  
 **Justificación de limpieza:** [docs/03_limpieza_datos.md](03_limpieza_datos.md)  
-**Rol en la cadena:** `01` → `02` (historial) → `03` → **04 (este)** → UI Streamlit
+**Rol en la cadena (histórico):** `01` → `02` → `03` → **04 (este)** → UI Streamlit
 
 ---
 

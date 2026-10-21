@@ -7,10 +7,6 @@ venv/
 .env
 .DS_Store
 
-# Datos regenerados en cada instalación (no versionar CSV)
-data/**/*.csv
-data/originales/niveles/
-
 # Cachés / builds locales
 .pytest_cache/
 .mypy_cache/

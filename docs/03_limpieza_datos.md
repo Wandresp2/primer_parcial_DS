@@ -1,12 +1,14 @@
 # Documentación técnica — Limpieza y transformación de datos
 
-**Implementación:** `scripts/03_limpieza_datos.py` (ejecutado por `scripts/run_pipeline.sh` / `./instalar.sh`)  
+> **Nota runtime (2026-10):** el arranque del producto es `docker compose up` + `init.sql`. Este documento es **historial** de las decisiones L1–L14 (las rutas `scripts/` / `data/` ya no están en el repo).
+
+**Implementación (histórica):** `scripts/03_limpieza_datos.py`  
 **Proyecto:** Óptica y Fotónica — Primer Parcial  
 **Estudiante:** Perez Criollo Andres David  
-**Entrada:** `data/originales/` (solo lectura)  
-**Salida:** `data/procesados/`  
+**Entrada (histórica):** `data/originales/`  
+**Salida (histórica):** `data/procesados/`  
 **Diagnóstico de partida:** [docs/02_exploracion_caracterizacion_datos.md](02_exploracion_caracterizacion_datos.md)  
-**Rol en la cadena:** `01` → `02` (historial) → **03 (este)** → `04` → UI Streamlit
+**Rol en la cadena (histórico):** `01` → `02` → **03 (este)** → `04` → UI Streamlit
 
 ---
 

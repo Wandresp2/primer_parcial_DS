@@ -3,7 +3,8 @@
 **Proyecto:** Primer Parcial — Desarrollo de Software  
 **Estudiante:** Perez Criollo Andres David  
 **Estado:** **implementado** (Fases 1–8 + refactor `init.sql` / Compose sin pipeline)  
-**Documento vivo:** este archivo es la fuente de verdad del diseño. La conversación de Cursor puede truncarse; aquí queda todo el contexto operativo.
+**Documento vivo:** historial de diseño. El arranque actual es `docker compose up -d --build` + `init.sql` (ver `README.md`).  
+**Limpieza 2026-10-20:** eliminados del repo `scripts/`, `data/`, `sql/`, `instalar.sh` (ya no son runtime). Se conservan `docs/` y este plan como documentación del parcial.
 
 **Referencia de patrón (solo estructura, no temática):** proyecto anterior (exoplanetas) — `instalar.sh` + Compose + ETL `.py` + Streamlit. La carpeta `automatizacion/` de referencia **ya fue eliminada** (Fase 7 / D18).
 
@@ -789,3 +790,4 @@ Fase 0 (plan)
 | 2026-10-20 | Streamlit pin **1.40.2 → 1.51.0** (estable; `width="stretch"` en UI; evitar 1.65+). `.env` documentado como nice-to-have (no implementado). |
 | 2026-10-20 | Dump **`init.sql`** (~4.5 MB) desde `mysql_container` (`optica_y_fotonica`, ~52 812 filas). Camino Hub: init en primer arranque, sin pipeline obligatorio. Reducir datos = nice to have. `instalar.sh` no va dentro de la imagen Hub. |
 | 2026-10-20 | **Refactor entrega:** un `Dockerfile` + `requirements.txt` pinneado; `.dockerignore`; compose monta `init.sql` (opción A); sin servicio `pipeline`; arranque `docker compose up -d --build`; `instalar.sh` solo atajo local. |
+| 2026-10-20 | **Limpieza repo:** eliminados `scripts/`, `data/`, `sql/`, `instalar.sh`. Runtime = compose + `init.sql` + `app/`. Conservados `docs/` y este plan. |

@@ -12,21 +12,11 @@ venv
 .mypy_cache
 .streamlit
 
-# No van en la imagen de la app (MySQL usa init.sql por mount en compose)
-instalar.sh
+# No van en la imagen de Streamlit (MySQL usa init.sql por mount)
 init.sql
-scripts/
-data/
 docs/
-sql/
 *.csv
 *.ipynb
 *.pptx
 *.md
 PLAN_AUTOMATIZACION.md
-
-# Dockerfiles/requirements legacy (si reaparecen)
-Dockerfile.pipeline
-Dockerfile.streamlit
-requirements-app.txt
-requirements-pipeline.txt

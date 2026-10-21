@@ -1,10 +1,12 @@
 # Documentación técnica — Exploración y caracterización de datos
 
-**Estado:** historial metodológico (la etapa 02 **no** forma parte de `./instalar.sh`)  
+> **Nota runtime (2026-10):** el arranque del producto es `docker compose up` + `init.sql`. Este documento es **historial metodológico** (las rutas `scripts/` / `data/` ya no están en el repo).
+
+**Estado:** historial metodológico  
 **Proyecto:** Óptica y Fotónica — Primer Parcial  
 **Estudiante:** Perez Criollo Andres David  
 **Fuente:** NIST Atomic Spectra Database (ASD)  
-**Rol en la cadena:** `01` (descarga) → **02 (diagnóstico, este doc)** → `03` (limpieza) → `04` (ETL) → UI Streamlit
+**Rol en la cadena (histórico):** `01` (descarga) → **02 (diagnóstico, este doc)** → `03` (limpieza) → `04` (ETL) → UI Streamlit
 
 ---
 
