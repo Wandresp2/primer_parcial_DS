@@ -1,0 +1,8 @@
+# Versiones fijadas (imagen reproducible). Evitar Streamlit 1.65+ (UI en blanco en Docker).
+streamlit==1.51.0
+pandas==2.3.3
+numpy==2.4.6
+plotly==7.1.0
+SQLAlchemy==2.1.5
+mysql-connector-python==26.7.0
+PyMySQL==1.2.3

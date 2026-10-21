@@ -1,9 +1,0 @@
-# 1.51.x: estable en Docker + API width="stretch" (dataframe/plotly).
-# Evitar 1.65+ (uvicorn) que puede dejar pantalla en blanco.
-streamlit==1.51.0
-plotly
-pandas
-numpy
-mysql-connector-python
-sqlalchemy
-pymysql

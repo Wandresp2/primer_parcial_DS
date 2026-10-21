@@ -1,31 +1,35 @@
-# Óptica y Fotónica — NIST ASD → MySQL → Streamlit
+# Óptica y Fotónica — MySQL + Streamlit (NIST ASD)
 
-Pipeline automatizado de datos atómicos (H–Ne) del [NIST Atomic Spectra Database](https://physics.nist.gov/PhysRefData/ASD/): descarga, limpieza, carga en MySQL 8.4 e interfaz analítica con Streamlit.
+Datos atómicos (H–Ne) del [NIST Atomic Spectra Database](https://physics.nist.gov/PhysRefData/ASD/) en MySQL 8.4, con interfaz analítica en Streamlit.
 
-**Un solo comando** reproduce el sistema completo (sin Jupyter, sin DBeaver, sin notebooks).
+**Arranque principal:** un comando de Docker Compose. La base se puebla sola con `init.sql` (no hace falta el pipeline NIST en runtime).
 
 ## Requisitos
 
-- Docker Engine + Compose (en Windows: Docker Desktop con integración **WSL2**)
-- Bash (Linux nativo o **WSL**)
+- Docker Engine + Compose (en Windows: Docker Desktop)
 - Puertos libres **3306** (MySQL) y **8501** (Streamlit)
-- Internet (imagenes Docker, pip en el build, API NIST)
 
 ## Arranque
 
-En WSL o Linux, desde la raíz del repositorio:
+Desde la raíz del repositorio:
 
 ```bash
-chmod +x instalar.sh
-./instalar.sh
+docker compose up -d --build
 ```
 
-El script:
+La primera vez (volumen MySQL vacío):
 
-1. Limpia solo los recursos Docker de este proyecto (`down -v`, volumen, red, imágenes del stack).
-2. Levanta MySQL 8.4 y espera el healthcheck.
-3. Ejecuta el pipeline en Docker: descarga NIST → limpieza L1–L14 → `sql/schema.sql` → ETL (9 tablas).
-4. Levanta Streamlit en background.
+1. MySQL ejecuta `init.sql` → crea `optica_y_fotonica`, 9 tablas, vista y datos.
+2. Se construye la imagen de Streamlit y queda en `http://localhost:8501`.
+
+Si ya tenías un volumen viejo sin datos o a medias:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+(`down -v` borra el volumen; el siguiente `up` vuelve a aplicar `init.sql`.)
 
 ### URLs y credenciales
 
@@ -38,61 +42,91 @@ El script:
 | Host MySQL (entre contenedores) | `mysql` |
 | Red Docker | `optica_net` |
 
-Credenciales fijas en `docker-compose.yml` (laboratorio). Streamlit y el pipeline usan las mismas variables de entorno. No hace falta un archivo `.env` para usar el proyecto.
+Credenciales de laboratorio en `docker-compose.yml`. La app lee `MYSQL_*` por entorno.
 
-**Nice to have (futuro):** un `.env` + `.env.example` para externalizar `MYSQL_*` sin editar el compose (buenas prácticas; no aporta seguridad real con `root`/`root` de laboratorio). El `.env` real no debería versionarse.
+**Nice to have (futuro):** `.env` + `.env.example` para externalizar `MYSQL_*` (el `.env` real no se versiona ni va a la imagen).
 
-### Streamlit (versión de la UI)
+### Streamlit
 
-- Pin: **`streamlit==1.51.0`** en `requirements-app.txt` (estable en Docker; soporta `width="stretch"` en dataframes/plotly).
-- Evitar **1.65+** (puede dejar pantalla en blanco por cambios de servidor/uvicorn).
-- Tras actualizar dependencias o clonar: rebuild de la imagen UI  
-  `docker compose build streamlit && docker compose up -d streamlit`  
-  (o vuelve a correr `./instalar.sh`).
+- Pin: **`streamlit==1.51.0`** en `requirements.txt` (`width="stretch"`; evitar **1.65+**).
+- Tras cambiar deps: `docker compose build streamlit && docker compose up -d streamlit`.
 
 ### Comandos útiles
 
 ```bash
 docker compose ps
 docker compose logs -f streamlit
-docker compose down          # apaga sin borrar datos MySQL
-docker compose down -v       # apaga y borra el volumen MySQL
+docker compose logs -f mysql
+docker compose down          # apaga; conserva datos MySQL
+docker compose down -v       # apaga y borra volumen (reaplica init.sql al subir)
 ```
 
-Reinstalación completa desde cero: vuelve a ejecutar `./instalar.sh`.
+`instalar.sh` es solo un atajo local a `docker compose up -d --build`. **No** se incluye en la imagen (`.dockerignore`).
+
+## `init.sql` (base portátil)
+
+- Dump de schema + datos (~4–5 MB) en la **raíz** del repo.
+- Se monta en MySQL: `./init.sql` → `/docker-entrypoint-initdb.d/01_init.sql`.
+- Corre **solo en el primer arranque** con volumen vacío.
+- Verificado frente al stack actual: 9 tablas + vista `v_linea_analisis` + `INSERT`s.
+
+### Volumen de datos
+
+| Tabla | Filas (aprox.) |
+|-------|---------------:|
+| elemento | 10 |
+| espectro | 18 |
+| exactitud | 13 |
+| tipo_transicion | 5 |
+| referencia | 377 |
+| nivel_energia | 5 752 |
+| linea_espectral | 18 288 |
+| nivel_referencia | 3 592 |
+| linea_referencia | 24 757 |
+| **Total tablas** | **~52 812** |
+| Vista `v_linea_analisis` | 18 288 |
+
+**Nice to have (no crítico):** reducir el subconjunto H–Ne si el primer import se siente lento en máquinas débiles. El archivo en sí es pequeño para GitHub / Docker Hub.
+
+Regenerar el dump (opcional, con MySQL ya poblado):
+
+```bash
+docker exec mysql_container mysqldump -uroot -proot \
+  --databases optica_y_fotonica --default-character-set=utf8mb4 \
+  --single-transaction --routines --triggers --set-gtid-purged=OFF \
+  -r /tmp/init.sql
+docker cp mysql_container:/tmp/init.sql ./init.sql
+```
+
+Los scripts en `scripts/` (pipeline NIST → ETL) quedan como **herramienta de regeneración**, no como arranque del producto.
 
 ## Estructura
 
 ```text
-instalar.sh                 Orquestador único
-docker-compose.yml          mysql + pipeline (profile) + streamlit
-Dockerfile.pipeline         Imagen del pipeline de datos
-Dockerfile.streamlit        Imagen de la UI
-requirements-*.txt          Dependencias Python por imagen
-sql/schema.sql              DDL: 9 tablas + vista v_linea_analisis
-scripts/
-  01_descarga_datos.py      Extract NIST → data/originales/
-  03_limpieza_datos.py      Transform → data/procesados/
-  04_etl_mysql.py           Load → MySQL
-  run_pipeline.sh           01 → 03 → 04
-app/
-  streamlit_app.py          UI (7 secciones + filtros)
-  db.py                     Conexión MySQL
-data/                       Generada en runtime (CSV no versionados)
-docs/                       Documentación técnica de cada etapa
-PLAN_AUTOMATIZACION.md      Plan e historial de la automatización
+docker compose up -d --build   # arranque principal
+init.sql                       # schema + datos (mount automático en MySQL)
+docker-compose.yml             # mysql + streamlit
+Dockerfile                     # imagen única de la app
+.dockerignore                  # excluye instalar.sh, scripts, data, .env, …
+requirements.txt               # deps pinneadas
+instalar.sh                    # atajo local (ignorado en build de imagen)
+app/                           # UI Streamlit
+scripts/                       # pipeline legacy / regenerar dump
+sql/schema.sql                 # DDL de referencia (sin datos)
+docs/                          # documentación técnica
+PLAN_AUTOMATIZACION.md         # historial de diseño
 ```
 
 ## Documentación técnica
 
 | Doc | Contenido |
 |-----|-----------|
-| [docs/02_…](docs/02_exploracion_caracterizacion_datos.md) | Diagnóstico metodológico (historial; no corre en el `.sh`) |
-| [docs/03_…](docs/03_limpieza_datos.md) | Decisiones L1–L14 → `scripts/03_limpieza_datos.py` |
-| [docs/04_…](docs/04_pipeline_etl_mysql.md) | Modelo relacional y ETL → `scripts/04_etl_mysql.py` |
-| [docs/05_…](docs/05_consultas_analisis_cientifico.md) | Pregunta científica → UI Streamlit |
+| [docs/02_…](docs/02_exploracion_caracterizacion_datos.md) | Diagnóstico metodológico |
+| [docs/03_…](docs/03_limpieza_datos.md) | Decisiones L1–L14 |
+| [docs/04_…](docs/04_pipeline_etl_mysql.md) | Modelo relacional y ETL |
+| [docs/05_…](docs/05_consultas_analisis_cientifico.md) | Pregunta científica → UI |
 
-Detalle del diseño automatizado: [PLAN_AUTOMATIZACION.md](PLAN_AUTOMATIZACION.md).
+Detalle de automatización / Hub: [PLAN_AUTOMATIZACION.md](PLAN_AUTOMATIZACION.md).
 
 ## Autor
 

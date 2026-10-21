@@ -10,46 +10,25 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      # Primer arranque (volumen vacío): carga schema + datos automáticamente
+      - ./init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
     networks:
       - optica_net
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
       interval: 5s
       timeout: 5s
-      retries: 20
-      start_period: 15s
-
-  pipeline:
-    build:
-      context: .
-      dockerfile: Dockerfile.pipeline
-    working_dir: /app
-    volumes:
-      - ./:/app
-    environment:
-      MYSQL_HOST: mysql
-      MYSQL_PORT: "3306"
-      MYSQL_USER: root
-      MYSQL_PASSWORD: root
-      MYSQL_DATABASE: optica_y_fotonica
-    networks:
-      - optica_net
-    depends_on:
-      mysql:
-        condition: service_healthy
-    profiles:
-      - pipeline
+      retries: 30
+      start_period: 60s
 
   streamlit:
     build:
       context: .
-      dockerfile: Dockerfile.streamlit
+      dockerfile: Dockerfile
     container_name: streamlit_optica
     restart: unless-stopped
     ports:
       - "8501:8501"
-    volumes:
-      - ./app:/app/app
     environment:
       MYSQL_HOST: mysql
       MYSQL_PORT: "3306"

@@ -2,7 +2,7 @@
 
 **Proyecto:** Primer Parcial — Desarrollo de Software  
 **Estudiante:** Perez Criollo Andres David  
-**Estado:** **implementado** (Fases 1–8 completadas)  
+**Estado:** **implementado** (Fases 1–8 + refactor `init.sql` / Compose sin pipeline)  
 **Documento vivo:** este archivo es la fuente de verdad del diseño. La conversación de Cursor puede truncarse; aquí queda todo el contexto operativo.
 
 **Referencia de patrón (solo estructura, no temática):** proyecto anterior (exoplanetas) — `instalar.sh` + Compose + ETL `.py` + Streamlit. La carpeta `automatizacion/` de referencia **ya fue eliminada** (Fase 7 / D18).
@@ -186,6 +186,24 @@ El usuario entra al navegador (en Windows, con Docker Desktop + WSL, normalmente
 | Streamlit | puerto host `8501:8501` |
 
 **Nice to have (futuro, no bloqueante):** `.env` + `.env.example` para `MYSQL_*` (compose con `env_file`), sin versionar el `.env` real. Hoy las variables viven en `docker-compose.yml`; es suficiente para laboratorio.
+
+### Dump portable `init.sql` (camino Docker Hub)
+
+Tras un MySQL ya cargado por el pipeline:
+
+```bash
+docker exec mysql_container mysqldump -uroot -proot \
+  --databases optica_y_fotonica --default-character-set=utf8mb4 \
+  --single-transaction --routines --triggers --set-gtid-purged=OFF \
+  -r /tmp/init.sql
+docker cp mysql_container:/tmp/init.sql ./init.sql
+```
+
+- Tamaño tipico: **~4.5 MB**; ~52 812 filas en tablas + vista.
+- Uso: montar o hornear en `/docker-entrypoint-initdb.d/` (solo primer arranque con volumen vacío).
+- Regenerar dump **antes** de `down -v` si se vuelve a poblar con pipeline.
+- **Nice to have:** recortar H–Ne (menos elementos/líneas) si el import se percibe lento; no es crítico con ~5 MB.
+- `instalar.sh` **no** se incluye en la imagen Hub; el arranque público objetivo es compose (+ init), no el pipeline NIST.
 
 ---
 
@@ -769,3 +787,5 @@ Fase 0 (plan)
 | 2026-10-10 | **Fase 7 hecha:** eliminados `notebooks/`, `automatizacion/`, `_gen_03_from_nb.py`; README + docs/02–05 + `schema.sql` alineados a `./instalar.sh`. |
 | 2026-10-11 | **Fase 8 hecha:** doble `./instalar.sh` OK; MySQL 52 812 filas; Streamlit 7 secciones + filtros; plan marcado **implementado**. |
 | 2026-10-20 | Streamlit pin **1.40.2 → 1.51.0** (estable; `width="stretch"` en UI; evitar 1.65+). `.env` documentado como nice-to-have (no implementado). |
+| 2026-10-20 | Dump **`init.sql`** (~4.5 MB) desde `mysql_container` (`optica_y_fotonica`, ~52 812 filas). Camino Hub: init en primer arranque, sin pipeline obligatorio. Reducir datos = nice to have. `instalar.sh` no va dentro de la imagen Hub. |
+| 2026-10-20 | **Refactor entrega:** un `Dockerfile` + `requirements.txt` pinneado; `.dockerignore`; compose monta `init.sql` (opción A); sin servicio `pipeline`; arranque `docker compose up -d --build`; `instalar.sh` solo atajo local. |

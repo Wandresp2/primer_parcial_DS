@@ -5,20 +5,17 @@
 -- ============================================================================
 --
 -- Este script contiene UNICAMENTE DDL (definicion de estructura). No inserta
--- ningun dato: la carga la hace scripts/04_etl_mysql.py (via ./instalar.sh).
+-- datos. El arranque del producto usa init.sql (schema + datos) montado en
+-- MySQL via docker-compose. Este archivo queda como referencia / regeneracion.
 --
--- Orden de ejecucion del proyecto (automatizado):
---   1. docker compose up -d mysql
---   2. Este DDL lo aplica scripts/04_etl_mysql.py via mysql client
---   3. scripts/04_etl_mysql.py puebla las 9 tablas
---   4. Streamlit (app/) consulta la base en la red optica_net
+-- Arranque actual:
+--   docker compose up -d --build
+--   → MySQL aplica ./init.sql en el primer arranque (volumen vacio)
+--   → Streamlit en http://localhost:8501
 --
--- Tambien se puede aplicar a mano:
+-- Regenerar dump con datos (opcional): mysqldump → init.sql (ver README).
+-- Aplicar solo DDL a mano:
 --   docker exec -i <mysql_container> mysql -uroot -proot --skip-ssl < sql/schema.sql
---
--- El script es RECONSTRUIBLE DESDE CERO: puede ejecutarse cuantas veces se
--- quiera, porque empieza eliminando (si existen) la vista y las 9 tablas en
--- el orden inverso de sus dependencias, y luego las vuelve a crear.
 --
 -- Diseno relacional y carga ETL documentados en: docs/04_pipeline_etl_mysql.md
 -- Origen de los datos y proceso de limpieza en: docs/03_limpieza_datos.md
