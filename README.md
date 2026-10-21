@@ -4,6 +4,8 @@ Datos atómicos (H–Ne) del [NIST Atomic Spectra Database](https://physics.nist
 
 **Entrega (opción A del taller):** una imagen tuya en Docker Hub + `init.sql` en el repo + `docker compose`.
 
+**Un solo comando** (`./lab-arranque.sh` o `.\lab-arranque.ps1`) reproduce el sistema completo.
+
 | Pieza | Valor |
 |-------|--------|
 | Imagen UI (Hub) | `andresperez3/optica-fotonica:latest` |
@@ -16,7 +18,10 @@ Datos atómicos (H–Ne) del [NIST Atomic Spectra Database](https://physics.nist
 
 ### Requisitos
 
-- Docker + Compose
+- Docker Engine + Compose (en Windows: Docker Desktop con integración **WSL2**)
+- Bash (Linux nativo o **WSL**) o PowerShell
+- Puertos libres **3306** (MySQL) y **8501** (Streamlit)
+- Internet (imágenes de Docker Hub; pip solo si reconstruyes la imagen en local)
 - Clonar este repo (hacen falta `docker-compose.yml` + `init.sql`)
 
 ### Opción recomendada (libera puertos y usa Hub)
@@ -143,6 +148,8 @@ init.sql                # schema + datos (mount en MySQL)
 lab-arranque.sh         # Linux: libera puertos + pull + up
 lab-arranque.ps1        # Windows: igual
 app/
+  streamlit_app.py      UI (7 secciones + filtros)
+  db.py                 Conexión MySQL
 docs/                   # historial del parcial (no va en la imagen)
 README.md
 ```
